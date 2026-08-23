@@ -1,4 +1,4 @@
-# Scan — barcode health-score prototype
+# Food Truth Scanner — a barcode health-score prototype
 
 A Yuka/Truth-in-labeling–style barcode scanner prototype: scan any product,
 get a 0–100 health score, a plain-language verdict, a full ingredient
