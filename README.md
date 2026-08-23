@@ -8,7 +8,7 @@ JS/HTML/CSS single-page app with no build step and no backend.
 This is a demo prototype, not a production app. It runs entirely
 client-side against a static, hand-researched 31-SKU dataset.
 
-**Live demo:** https://vedantm1049.github.io/scan/
+**Live demo:** https://vedantm1049.github.io/food-truth-scanner/
 
 ## Running it locally
 
