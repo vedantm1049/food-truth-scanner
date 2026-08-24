@@ -93,7 +93,7 @@ function applyCuratedForYouCopy() {
   const product = getProduct(state.overlay.id);
   if (!product) return;
   const titles = [...document.querySelectorAll(".panel-title")];
-  const title = titles.find((el) => el.textContent.trim() === "Fits Your Day" || el.textContent.trim() === "For You");
+  const title = titles.find((el) => el.textContent.trim() === "Fits Your Day");
   if (!title) return;
   const panel = title.closest(".panel");
   if (!panel) return;
@@ -157,6 +157,9 @@ function injectTargetSettingsIntoAccount() {
   const appContent = document.querySelector(".app-content");
   if (!appContent || appContent.querySelector(".target-settings-panel")) return;
   const targetGrid = appContent.querySelector(".target-grid");
+  const sectionLabels = [...appContent.querySelectorAll(".section-label")];
+  const dailyLabel = sectionLabels.find((el) => el.textContent.includes("My Daily Targets"));
+  if (dailyLabel) dailyLabel.textContent = state.profile.targetMode === "custom" ? "My Daily Targets — custom" : "My Daily Targets — recommended";
   if (targetGrid) targetGrid.insertAdjacentHTML("afterend", renderTargetSettings());
   else appContent.insertAdjacentHTML("beforeend", renderTargetSettings());
 }
