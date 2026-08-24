@@ -6,8 +6,17 @@
 <title>Food Truth Scanner</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css" />
+<link rel="stylesheet" href="styles.css?v=20260824-1" />
 <link rel="stylesheet" href="off-styles.css?v=20260824-2" />
+<style>
+  /* Keep overlays opaque throughout transitions so an OFF loading/result
+     state never exposes the underlying home screen between renders. */
+  .overlay { animation: foodTruthOverlaySlide 0.18s ease !important; }
+  @keyframes foodTruthOverlaySlide {
+    from { transform: translateY(10px); opacity: 1; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+</style>
 </head>
 <body>
   <div id="phone-frame">
