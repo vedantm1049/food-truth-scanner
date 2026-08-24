@@ -1,8 +1,10 @@
 # Food Truth Scanner — personalized food intelligence from a barcode
 
-Scan a grocery product to turn nutrition, ingredients and allergens into a transparent 0–100 score personalized to your goals.
+Scan any grocery barcode to get an explainable food score and see how it fits your personal nutrition goals.
 
 **Live demo:** https://vedantm1049.github.io/food-truth-scanner/
+
+![Food Truth Scanner demo]<img width="400" height="529" alt="FTS recording" src="https://github.com/user-attachments/assets/79ecf1d4-8d2c-4ecc-8157-bfff150984f7" />
 
 ## What it does
 
