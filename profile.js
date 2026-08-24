@@ -1,13 +1,13 @@
 /**
- * Food Truth Scanner — profile & daily target calculator
+ * Food Truth Scanner — profile & daily target calculator.
  *
  * Recommended targets are computed from the profile using Mifflin-St Jeor
  * BMR -> activity multiplier -> goal adjustment. Users can optionally
  * override the targets that matter to the personalized "For You" layer.
  *
  * The app does not pretend to know what the user has eaten today. Products
- * are therefore shown as a contribution to daily targets, never as an amount
- * of a fictional "remaining" allowance.
+ * are shown as a contribution to daily targets, never as an amount of a
+ * fictional "remaining" allowance.
  */
 
 const ACTIVITY_MULTIPLIERS = {
@@ -53,27 +53,19 @@ function bmr({ gender, heightCm, weightKg, age }) {
 
 function goalCalorieAdjustment(goal) {
   switch (goal) {
-    case "lose_weight":
-      return -500;
-    case "gain_weight":
-      return 500;
-    case "build_muscle":
-      return 250;
-    default:
-      return 0;
+    case "lose_weight": return -500;
+    case "gain_weight": return 500;
+    case "build_muscle": return 250;
+    default: return 0;
   }
 }
 
 function proteinPerKg(goal) {
   switch (goal) {
-    case "lose_weight":
-      return 2.0;
-    case "build_muscle":
-      return 2.2;
-    case "gain_weight":
-      return 1.8;
-    default:
-      return 1.6;
+    case "lose_weight": return 2.0;
+    case "build_muscle": return 2.2;
+    case "gain_weight": return 1.8;
+    default: return 1.6;
   }
 }
 
@@ -82,21 +74,17 @@ function fatPctOfCalories(goal) {
 }
 
 function computeRecommendedDailyTargets(profile) {
-  const b = bmr(profile);
-  const tdee = b * (ACTIVITY_MULTIPLIERS[profile.activityLevel] || 1.375);
+  const base = bmr(profile);
+  const tdee = base * (ACTIVITY_MULTIPLIERS[profile.activityLevel] || 1.375);
   const calories = Math.round(tdee + goalCalorieAdjustment(profile.goal));
-
   const protein_g = Math.round(proteinPerKg(profile.goal) * profile.weightKg);
   const fatCalories = calories * fatPctOfCalories(profile.goal);
   const fat_g = Math.round(fatCalories / 9);
   const proteinCalories = protein_g * 4;
   const carbCalories = Math.max(0, calories - proteinCalories - fatCalories);
   const carbs_g = Math.round(carbCalories / 4);
-
-  // Daily ceilings used by the prototype for context, not medical advice.
   const sugar_g = Math.round((calories * 0.10) / 4);
   const sodium_mg = 2000;
-
   return { calories, protein_g, carbs_g, fat_g, sugar_g, sodium_mg };
 }
 
@@ -106,14 +94,9 @@ function validCustomTarget(value, fallback, min, max) {
   return Math.round(n);
 }
 
-/**
- * Returns the daily targets used by the app. Recommended targets are the
- * default; users can override calories, protein, sugar and sodium in Account.
- */
 function computeDailyTargets(profile) {
   const recommended = computeRecommendedDailyTargets(profile);
   if (profile.targetMode !== "custom") return recommended;
-
   const custom = profile.customTargets || {};
   return {
     ...recommended,
@@ -124,12 +107,8 @@ function computeDailyTargets(profile) {
   };
 }
 
-/**
- * Backward-compatibility helper for the original curated-result template.
- * It now returns the full daily targets because the app no longer simulates
- * food already consumed. The shared personalization layer replaces the old
- * wording and bars with explicit daily-target contribution UI.
- */
+// Legacy helper retained until the original curated result template is fully
+// refactored. It no longer simulates consumption: it simply returns targets.
 function computeRemainingToday(targets) {
   return { ...targets };
 }
