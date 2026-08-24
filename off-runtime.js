@@ -1,11 +1,18 @@
 /* Runtime bridge for Open Food Facts.
- * Intentionally separate from the curated Market PDP so existing product
- * behavior stays untouched.
+ * External products stay separate from the curated Market catalogue.
  */
 
 const _foodTruthOriginalRender = render;
 const _foodTruthOriginalHandleScanResult = handleScanResult;
+const _foodTruthOriginalCloseOverlay = closeOverlay;
 let _offLookupToken = 0;
+
+// Closing an OFF loading/result screen invalidates any in-flight lookup so an
+// async response cannot reopen a result after the user has dismissed it.
+closeOverlay = function() {
+  _offLookupToken += 1;
+  return _foodTruthOriginalCloseOverlay();
+};
 
 function offDisplayValue(value, unit) {
   return value == null ? "Not available" : `${value}${unit || ""}`;
@@ -20,6 +27,14 @@ function offConfidenceHTML(p) {
       <span class="off-source-label">Community-sourced product data</span>
     </div>
     <div class="panel-sub" style="margin-top:8px;">${c.note}</div>
+  </div>`;
+}
+
+function offScoreScopeHTML(p) {
+  if (!p.canScore) return "";
+  return `<div class="panel">
+    <div class="panel-title">Score scope</div>
+    <div class="panel-sub" style="margin-bottom:0;">This external result is a <b>nutrition-based score</b> using sugar, saturated fat, sodium, protein and fiber data from Open Food Facts. The curated catalogue's manually reviewed processing/ingredient-marker penalty is not applied to external products, because Food Truth Scanner has not independently reviewed this ingredient list.</div>
   </div>`;
 }
 
@@ -66,8 +81,8 @@ function offScoreExplanation(p, result) {
     .sort((a, b2) => b2.points - a.points);
 
   const bonuses = [
-    { label: "protein", points: b.proteinBonus, value: n.protein_g, unit: "g" },
-    { label: "fiber", points: b.fiberBonus, value: n.fiber_g, unit: "g" },
+    { label: "protein", points: b.proteinBonus },
+    { label: "fiber", points: b.fiberBonus },
   ].filter((x) => x.points > 0);
 
   const parts = [];
@@ -85,7 +100,7 @@ function offScoreExplanation(p, result) {
   if (bonuses.length) {
     const bonusText = bonuses.map((x) => `${x.label} +${x.points}`).join(" and ");
     parts.push(`${bonusText.charAt(0).toUpperCase() + bonusText.slice(1)} helps the score.`);
-  } else if (result.bonusZeroedByMaxedAxis && (n.protein_g > 0 || n.fiber_g > 0)) {
+  } else if (result.bonusZeroedByMaxedAxis && ((n.protein_g || 0) > 0 || (n.fiber_g || 0) > 0)) {
     parts.push("Protein or fiber does not offset the score because at least one negative nutrient is already in the high range.");
   }
 
@@ -103,7 +118,7 @@ function renderOffResultOverlay(p) {
   return `<div class="overlay">
     <div class="overlay-header"><div class="close-btn" onclick="closeOverlay()">${ICONS.close}</div></div>
     <div class="overlay-body">
-      <div class="off-source-banner">External barcode result · Data from Open Food Facts</div>
+      <div class="off-source-banner">External barcode result · ${result ? "Nutrition-based score · " : ""}Data from Open Food Facts</div>
       ${hits.length ? `<div class="allergen-banner">${ICONS.alert}<div><div class="title">Contains ${hits.map((a) => ALLERGEN_LABELS[a]).join(", ")}</div><div class="sub">This allergen appears in Open Food Facts and matches your profile. Verify the physical label before relying on community-sourced allergen data.</div></div></div>` : ""}
 
       <div class="result-product-head">
@@ -114,9 +129,9 @@ function renderOffResultOverlay(p) {
       <div class="score-ring-row" style="background:${tier.bg};">
         ${result ? `<div class="score-ring"><svg width="84" height="84"><circle cx="42" cy="42" r="36" stroke="#ffffffaa" stroke-width="8" fill="none"/><circle cx="42" cy="42" r="36" stroke="${tier.color}" stroke-width="8" fill="none" stroke-dasharray="${dash} ${circumference}" stroke-linecap="round"/></svg><div class="score-num" style="color:${tier.color};">${result.score}</div></div>` : `<div class="off-score-na">—</div>`}
         <div style="flex:1;"><div class="tier-name" style="color:${tier.color};">${tier.label}</div><div class="verdict" style="color:${tier.color};">${scoreExplanation}</div></div>
-        ${result ? `<div class="score-info-btn" style="color:${tier.color};" onclick="openMethodology()" aria-label="How we calculate this score">${ICONS.info}</div>` : ""}
       </div>
 
+      ${offScoreScopeHTML(p)}
       ${offConfidenceHTML(p)}
       ${offNutritionHTML(p)}
       ${offIngredientsHTML(p)}
@@ -125,8 +140,6 @@ function renderOffResultOverlay(p) {
         <div class="panel-title">Data source</div>
         <div class="panel-sub">This product's nutrition, ingredients and allergen information comes from Open Food Facts and has not been independently verified by Food Truth Scanner.</div>
       </div>
-
-      ${result ? `<div class="methodology-link" onclick="openMethodology()">${ICONS.info}<span>How we calculate this</span></div>` : ""}
     </div>
   </div>`;
 }
@@ -139,11 +152,9 @@ handleScanResult = async function(code) {
   const normalized = String(code || "").trim();
   if (!normalized) return;
 
-  // Curated catalogue always wins and keeps the exact existing PDP.
   const curated = getProductByBarcode(normalized);
   if (curated) return _foodTruthOriginalHandleScanResult(normalized);
 
-  // Explicitly removed products stay removed rather than resurfacing via OFF.
   if (typeof REMOVED_PRODUCT_BARCODES !== "undefined" && REMOVED_PRODUCT_BARCODES.has(normalized)) {
     state.manualEntryOpen = false;
     state.overlay = { type: "notFound", code: normalized };
@@ -154,9 +165,9 @@ handleScanResult = async function(code) {
   state.manualEntryOpen = false;
   state.ingredientsExpanded = false;
   state.overlay = { type: "offLoading", code: normalized };
+  const token = ++_offLookupToken;
   render();
 
-  const token = ++_offLookupToken;
   try {
     const product = await fetchOpenFoodFactsProduct(normalized);
     if (token !== _offLookupToken) return;
@@ -180,5 +191,4 @@ render = function() {
   }
 };
 
-// Render once with the extended runtime installed.
 render();
