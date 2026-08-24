@@ -60,7 +60,7 @@ scoring.js              Transparent deterministic scoring engine
 profile.js              Daily calorie/macro target calculator
 data.js                 Curated product dataset
 catalog-overrides.js    Active catalogue removals
-aopen-food-facts.js     Open Food Facts adapter
+open-food-facts.js      Open Food Facts adapter
 off-runtime.js          External barcode lookup + OFF-only result screen
 off-styles.css          Styles for external product states
 styles.css              Main app styling
