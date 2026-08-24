@@ -64,8 +64,6 @@ function forYouBarsHTML(product, remaining) {
   const rows = [];
   if (product.nutrition.calories != null) rows.push(renderMacroBar("Calories", product.nutrition.calories, remaining.calories, ""));
   if (product.nutrition.sugar_g != null) rows.push(renderMacroBar("Sugar", product.nutrition.sugar_g, remaining.sugar_g, "g"));
-  // Open Food Facts can omit protein; the adapter currently represents missing
-  // protein as zero, so only show it when a positive value is actually present.
   if (!product.isOpenFoodFacts || product.nutrition.protein_g > 0) rows.push(renderMacroBar("Protein", product.nutrition.protein_g, remaining.protein_g, "g"));
   if (product.nutrition.sodium_mg != null) rows.push(renderMacroBar("Sodium", product.nutrition.sodium_mg, remaining.sodium_mg, "mg"));
   return rows.join("");
@@ -76,27 +74,29 @@ function renderForYouPanel(product) {
   const remaining = computeRemainingToday(targets, state.profile.consumedFraction);
   const summary = forYouSummary(product, remaining, state.profile);
 
-  return `<div class="panel">
+  return `<div class="panel for-you-panel">
     <div class="panel-title">For You</div>
     <div class="panel-sub">${summary}</div>
     ${forYouBarsHTML(product, remaining)}
   </div>`;
 }
 
-// Curated / Market products already had a personalized macro panel. Keep the
-// same bars, but make the heading neutral and the explanatory line genuinely
-// personalized rather than always claiming the product "fits" the day.
-const _foodTruthOriginalRenderResultOverlay = renderResultOverlay;
-renderResultOverlay = function(id) {
-  const product = getProduct(id);
-  let html = _foodTruthOriginalRenderResultOverlay(id);
-  const replacement = renderForYouPanel(product);
-  html = html.replace(
-    /<div class="panel">\s*<div class="panel-title">Fits Your Day<\/div>\s*<div class="panel-sub">Based on your computed daily targets and roughly where you are in the day — not a generic recommendation\.<\/div>[\s\S]*?<\/div>\s*<div class="panel">\s*<div class="panel-title">Nutrient Breakdown<\/div>/,
-    `${replacement}\n\n      <div class="panel">\n        <div class="panel-title">Nutrient Breakdown</div>`
-  );
-  return html;
-};
+// Curated / Market results: keep the existing macro bars and simply make the
+// heading neutral plus the supporting sentence genuinely personalized.
+function applyCuratedForYouCopy() {
+  if (!state.overlay || state.overlay.type !== "result") return;
+  const product = getProduct(state.overlay.id);
+  if (!product) return;
+  const titles = [...document.querySelectorAll(".panel-title")];
+  const title = titles.find((el) => el.textContent.trim() === "Fits Your Day");
+  if (!title) return;
+  const panel = title.closest(".panel");
+  const sub = panel && panel.querySelector(".panel-sub");
+  const targets = computeDailyTargets(state.profile);
+  const remaining = computeRemainingToday(targets, state.profile.consumedFraction);
+  title.textContent = "For You";
+  if (sub) sub.textContent = forYouSummary(product, remaining, state.profile);
+}
 
 // External OFF products did not previously get the personalized layer. Insert
 // the same "For You" panel before the OFF confidence/data panels.
@@ -111,3 +111,8 @@ if (typeof renderOffResultOverlay === "function") {
     return html;
   };
 }
+
+const _forYouObserver = new MutationObserver(() => applyCuratedForYouCopy());
+const _forYouRoot = document.getElementById("app");
+if (_forYouRoot) _forYouObserver.observe(_forYouRoot, { childList: true, subtree: true });
+applyCuratedForYouCopy();
