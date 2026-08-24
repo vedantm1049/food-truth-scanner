@@ -52,12 +52,53 @@ function offNutritionHTML(p) {
   </div>`;
 }
 
+function offScoreExplanation(p, result) {
+  if (!result) return p.verdict;
+
+  const n = result.per100g;
+  const b = result.breakdown;
+  const deductions = [
+    { label: "sugar", points: b.sugarPts, value: n.sugar_g, unit: "g" },
+    { label: "saturated fat", points: b.satFatPts, value: n.satFat_g, unit: "g" },
+    { label: "sodium", points: b.sodiumPts, value: n.sodium_mg, unit: "mg" },
+  ]
+    .filter((x) => x.points > 0)
+    .sort((a, b2) => b2.points - a.points);
+
+  const bonuses = [
+    { label: "protein", points: b.proteinBonus, value: n.protein_g, unit: "g" },
+    { label: "fiber", points: b.fiberBonus, value: n.fiber_g, unit: "g" },
+  ].filter((x) => x.points > 0);
+
+  const parts = [];
+  if (deductions.length) {
+    const lead = deductions[0];
+    parts.push(`${lead.label.charAt(0).toUpperCase() + lead.label.slice(1)} is the biggest drag at ${Math.round(lead.value * 10) / 10}${lead.unit} per 100${result.isDrink ? "ml" : "g"} (−${lead.points} points).`);
+    if (deductions[1] && deductions[1].points >= 3) {
+      const second = deductions[1];
+      parts.push(`${second.label.charAt(0).toUpperCase() + second.label.slice(1)} also pulls it down (−${second.points}).`);
+    }
+  } else {
+    parts.push("Sugar, saturated fat and sodium are all low enough to avoid meaningful deductions.");
+  }
+
+  if (bonuses.length) {
+    const bonusText = bonuses.map((x) => `${x.label} +${x.points}`).join(" and ");
+    parts.push(`${bonusText.charAt(0).toUpperCase() + bonusText.slice(1)} helps the score.`);
+  } else if (result.bonusZeroedByMaxedAxis && (n.protein_g > 0 || n.fiber_g > 0)) {
+    parts.push("Protein or fiber does not offset the score because at least one negative nutrient is already in the high range.");
+  }
+
+  return parts.join(" ");
+}
+
 function renderOffResultOverlay(p) {
   const hits = allergenHits(p, state.profile);
   const result = p.canScore ? computeCaloScore(p) : null;
   const tier = result ? tierForScore(result.score) : { color: "#6b7280", bg: "#f3f4f6", label: "Score unavailable" };
   const circumference = 2 * Math.PI * 36;
   const dash = result ? (result.score / 100) * circumference : 0;
+  const scoreExplanation = offScoreExplanation(p, result);
 
   return `<div class="overlay">
     <div class="overlay-header"><div class="close-btn" onclick="closeOverlay()">${ICONS.close}</div></div>
@@ -72,7 +113,7 @@ function renderOffResultOverlay(p) {
 
       <div class="score-ring-row" style="background:${tier.bg};">
         ${result ? `<div class="score-ring"><svg width="84" height="84"><circle cx="42" cy="42" r="36" stroke="#ffffffaa" stroke-width="8" fill="none"/><circle cx="42" cy="42" r="36" stroke="${tier.color}" stroke-width="8" fill="none" stroke-dasharray="${dash} ${circumference}" stroke-linecap="round"/></svg><div class="score-num" style="color:${tier.color};">${result.score}</div></div>` : `<div class="off-score-na">—</div>`}
-        <div style="flex:1;"><div class="tier-name" style="color:${tier.color};">${tier.label}</div><div class="verdict" style="color:${tier.color};">${p.verdict}</div></div>
+        <div style="flex:1;"><div class="tier-name" style="color:${tier.color};">${tier.label}</div><div class="verdict" style="color:${tier.color};">${scoreExplanation}</div></div>
         ${result ? `<div class="score-info-btn" style="color:${tier.color};" onclick="openMethodology()" aria-label="How we calculate this score">${ICONS.info}</div>` : ""}
       </div>
 
@@ -81,8 +122,8 @@ function renderOffResultOverlay(p) {
       ${offIngredientsHTML(p)}
 
       <div class="panel">
-        <div class="panel-title">About this result</div>
-        <div class="panel-sub">Product facts come from Open Food Facts. The 0–100 score, when enough nutrition data exists, is calculated locally by Food Truth Scanner using the same transparent nutrition rules as the curated catalogue. No product comparison or replacement recommendation is generated for external products.</div>
+        <div class="panel-title">Data source</div>
+        <div class="panel-sub">This product's nutrition, ingredients and allergen information comes from Open Food Facts and has not been independently verified by Food Truth Scanner.</div>
       </div>
 
       ${result ? `<div class="methodology-link" onclick="openMethodology()">${ICONS.info}<span>How we calculate this</span></div>` : ""}
