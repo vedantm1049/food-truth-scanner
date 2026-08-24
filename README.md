@@ -1,18 +1,47 @@
-# Food Truth Scanner — a barcode health-score prototype
+# Food Truth Scanner — personalized food intelligence from a barcode
 
-A Yuka/Truth-in-labeling–style barcode scanner prototype: scan any product,
-get a 0–100 health score, a plain-language verdict, a full ingredient
-breakdown, and a personalized allergen check — all built as a vanilla
-JS/HTML/CSS single-page app with no build step and no backend.
-
-This is a demo prototype, not a production app. It runs entirely
-client-side against a static, hand-researched 31-SKU dataset.
+Scan a grocery product to turn nutrition, ingredients and allergens into a transparent 0–100 score personalized to your goals.
 
 **Live demo:** https://vedantm1049.github.io/food-truth-scanner/
 
+## What it does
+
+- Scan a barcode with the camera or enter it manually.
+- Curated catalogue products use the existing hand-researched product data and product experience.
+- Unknown barcodes are looked up through Open Food Facts and, when enough core nutrition data exists, scored with Food Truth Scanner's own deterministic scoring engine.
+- Open Food Facts results show a **data-confidence indicator** because community product records vary in completeness.
+- If core scoring inputs are missing, the app shows the product information but explicitly marks the score as unavailable rather than guessing.
+- Scores respond to the user's profile, goals and allergies.
+- If a product contains a flagged allergen, an alert is shown regardless of its score.
+- Every score links to a plain-language explanation of the scoring methodology.
+
+## Two data paths
+
+### Curated catalogue
+
+The bundled catalogue contains hand-researched products with nutrition, ingredient and allergen data checked against brand, retailer and/or barcode-specific sources. These products retain the existing Market and product-detail experience.
+
+### Open Food Facts lookup
+
+If a scanned barcode is not in the curated catalogue, the browser queries Open Food Facts for product identity, nutrition, ingredients, allergens and imagery.
+
+Open Food Facts provides the raw product data. **Food Truth Scanner provides the scoring and personalization.** External products are kept separate from the curated catalogue: they are not added to Market or Browse, and the app does not generate product comparisons or replacement recommendations for them.
+
+Because Open Food Facts is community-maintained, each external result includes a High / Medium / Low data-confidence indicator based on the completeness of the product record. A score is only calculated when sugar, saturated fat and sodium are present; missing core inputs produce an explicit "Score unavailable" state.
+
+## The scoring methodology
+
+Every score is built from the UK Food Standards Agency's published front-of-pack "high in" thresholds for sugar, saturated fat and sodium, normalized per 100g/100ml so a small serving size cannot game the score. Drinks use the FSA's separate, stricter drink thresholds.
+
+Protein and fiber can contribute bonus points, but those bonuses are disabled once sugar, saturated fat or sodium reaches its "high" threshold, preventing one favorable macro from masking a material negative.
+
+For the curated catalogue, processing-marker penalties are based on review of the product's ingredient list. For Open Food Facts products, the score is intentionally conservative about what the external dataset can support and never fabricates missing nutrition data.
+
+The full implementation is in `scoring.js`, with the methodology also disclosed inside the app.
+
 ## Running it locally
 
-No build step, no dependencies to install. From this directory:
+No build step and no package installation required. From this directory:
 
 ```bash
 python3 -m http.server 8000
@@ -20,51 +49,28 @@ python3 -m http.server 8000
 
 Then open `http://localhost:8000/index.html` in a browser.
 
-(Any static file server works — Python's is just the shortest path.)
-
-## What it does
-
-- Scan a barcode (via camera or manual entry) or browse the catalogue,
-  and get a 0–100 score with a plain-language verdict for why it landed
-  there.
-- Score updates live against your own profile — change your macros,
-  goal, or allergies and every score and recommendation recalculates.
-- If a scanned product hits one of your flagged allergies, a red banner
-  overrides the screen regardless of score.
-- Product listings can be sorted by score (high→low / low→high) per
-  category or across the full catalogue.
-- Every score links to a "How we calculate this" sheet — the full
-  scoring logic is disclosed in-app, not a black box.
-
-## The scoring methodology
-
-Every score is built from the UK Food Standards Agency's own published
-front-of-pack "high in" thresholds for sugar, saturated fat, and sodium —
-not invented for this app — normalized per 100g/100ml so a small serving
-size can't game the score. Drinks are judged against the FSA's own
-separate, stricter drink thresholds rather than the solid-food table.
-Protein and fiber bonuses don't apply once any of those three has hit
-its "high" cutoff, so a real problem on one axis can't be erased by a
-good number elsewhere. Processing-marker penalties come from reviewing
-each product's actual ingredient list, not from counting additives.
-Full breakdown is in the in-app methodology sheet (`renderMethodologySheet()`
-in `app.js`) and in `scoring.js`.
+The Open Food Facts lookup requires an internet connection when testing unknown barcodes.
 
 ## Project structure
 
-```
-index.html      Entry point / shell
-app.js          UI rendering, routing, and interaction logic
-scoring.js      The scoring engine (documented inline)
-profile.js      Daily calorie/macro target calculator
-data.js         31-SKU product dataset
-styles.css      All styling
-assets/         Product images
+```text
+index.html              Entry point / shell
+app.js                  Existing UI, routing and curated-product interaction
+scoring.js              Transparent deterministic scoring engine
+profile.js              Daily calorie/macro target calculator
+data.js                 Curated product dataset
+catalog-overrides.js    Active catalogue removals
+aopen-food-facts.js     Open Food Facts adapter
+off-runtime.js          External barcode lookup + OFF-only result screen
+off-styles.css          Styles for external product states
+styles.css              Main app styling
+assets/                 Curated product images
 ```
 
-## Data
+## Data principles
 
-31 real products with researched (not invented) nutrition data. Fields
-with lower-confidence sourcing are flagged as such in the dataset itself
-rather than presented as verified. This is a hand-curated demo dataset,
-not a live product feed.
+- Curated products are not silently replaced by Open Food Facts data; the curated record always wins for known barcodes.
+- External product records are clearly labeled as Open Food Facts data.
+- Missing core nutrition data is never inferred or replaced with zero.
+- Open Food Facts products do not enter the Market catalogue.
+- Product scoring is deterministic and inspectable rather than generated by an LLM.
