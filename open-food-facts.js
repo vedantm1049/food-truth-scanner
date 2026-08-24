@@ -122,13 +122,12 @@ function adaptOpenFoodFactsProduct(code, product) {
     concernMarkers: [],
     positiveFlags: [],
     ingredients: offIngredients(product),
-    verdict: "Score calculated using Food Truth Scanner's transparent scoring rules on nutrition data supplied by Open Food Facts.",
+    verdict: canScore ? "" : "Score unavailable because Open Food Facts is missing sugar, saturated fat or sodium data for this barcode.",
     dataConfidence: offConfidence(product),
     offUrl: `https://world.openfoodfacts.org/product/${encodeURIComponent(code)}`,
     canScore,
   };
 
-  if (!canScore) p.verdict = "Score unavailable because Open Food Facts is missing sugar, saturated fat or sodium data for this barcode.";
   return p;
 }
 
