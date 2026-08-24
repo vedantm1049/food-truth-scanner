@@ -1,12 +1,13 @@
 /**
- * Scan — subscriber profile & daily target calculator
+ * Food Truth Scanner — profile & daily target calculator
  *
- * Computes real daily calorie/macro targets from the profile fields
- * already collected at onboarding, rather than using a static made-up
- * number. Method: Mifflin-St Jeor BMR -> activity multiplier -> goal
- * adjustment -> protein scaled to bodyweight and goal, fat as a % of
- * calories, carbs as the remainder. Sugar/sodium ceilings follow standard
- * WHO/AHA daily guidance. See the spec (§7.2) for the full rationale.
+ * Recommended targets are computed from the profile using Mifflin-St Jeor
+ * BMR -> activity multiplier -> goal adjustment. Users can optionally
+ * override the targets that matter to the personalized "For You" layer.
+ *
+ * The app does not pretend to know what the user has eaten today. Products
+ * are therefore shown as a contribution to daily targets, never as an amount
+ * of a fictional "remaining" allowance.
  */
 
 const ACTIVITY_MULTIPLIERS = {
@@ -58,7 +59,7 @@ function goalCalorieAdjustment(goal) {
       return 500;
     case "build_muscle":
       return 250;
-    default: // eat_healthy, maintain_weight
+    default:
       return 0;
   }
 }
@@ -66,7 +67,7 @@ function goalCalorieAdjustment(goal) {
 function proteinPerKg(goal) {
   switch (goal) {
     case "lose_weight":
-      return 2.0; // higher protein to protect lean mass in a deficit
+      return 2.0;
     case "build_muscle":
       return 2.2;
     case "gain_weight":
@@ -80,11 +81,7 @@ function fatPctOfCalories(goal) {
   return goal === "gain_weight" ? 0.3 : 0.25;
 }
 
-/**
- * Computes daily targets from a profile object:
- * { gender, age, heightCm, weightKg, targetWeightKg, goal, activityLevel }
- */
-function computeDailyTargets(profile) {
+function computeRecommendedDailyTargets(profile) {
   const b = bmr(profile);
   const tdee = b * (ACTIVITY_MULTIPLIERS[profile.activityLevel] || 1.375);
   const calories = Math.round(tdee + goalCalorieAdjustment(profile.goal));
@@ -96,45 +93,52 @@ function computeDailyTargets(profile) {
   const carbCalories = Math.max(0, calories - proteinCalories - fatCalories);
   const carbs_g = Math.round(carbCalories / 4);
 
-  // WHO guidance: free sugar <= 10% of calories (4 kcal/g). AHA sodium ceiling: 2000mg/day.
+  // Daily ceilings used by the prototype for context, not medical advice.
   const sugar_g = Math.round((calories * 0.10) / 4);
   const sodium_mg = 2000;
 
   return { calories, protein_g, carbs_g, fat_g, sugar_g, sodium_mg };
 }
 
-/**
- * "Remaining today" — in production this is (targets - consumed so far,
- * pulled from logged meals). In the prototype it's a simulated, editable
- * fraction standing in for that live data: defaults to "a bit past midday,
- * some of the day's budget already used."
- */
-function computeRemainingToday(targets, consumedFraction) {
-  const remaining = {};
-  for (const key of Object.keys(targets)) {
-    remaining[key] = Math.max(0, Math.round(targets[key] * (1 - consumedFraction)));
-  }
-  return remaining;
+function validCustomTarget(value, fallback, min, max) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < min || n > max) return fallback;
+  return Math.round(n);
 }
 
 /**
- * Returns the list of DIRECT allergen keys (subset of ALL_ALLERGENS) that a
- * product shares with the user's flagged allergies — empty if safe. Kept
- * separate from "may contain" cross-contact matches (below) because the two
- * carry different risk levels and should read differently on screen.
+ * Returns the daily targets used by the app. Recommended targets are the
+ * default; users can override calories, protein, sugar and sodium in Account.
  */
+function computeDailyTargets(profile) {
+  const recommended = computeRecommendedDailyTargets(profile);
+  if (profile.targetMode !== "custom") return recommended;
+
+  const custom = profile.customTargets || {};
+  return {
+    ...recommended,
+    calories: validCustomTarget(custom.calories, recommended.calories, 800, 6000),
+    protein_g: validCustomTarget(custom.protein_g, recommended.protein_g, 10, 400),
+    sugar_g: validCustomTarget(custom.sugar_g, recommended.sugar_g, 5, 250),
+    sodium_mg: validCustomTarget(custom.sodium_mg, recommended.sodium_mg, 200, 10000),
+  };
+}
+
+/**
+ * Backward-compatibility helper for the original curated-result template.
+ * It now returns the full daily targets because the app no longer simulates
+ * food already consumed. The shared personalization layer replaces the old
+ * wording and bars with explicit daily-target contribution UI.
+ */
+function computeRemainingToday(targets) {
+  return { ...targets };
+}
+
 function allergenHits(product, profile) {
   const flagged = new Set(profile.allergies || []);
   return (product.allergens || []).filter((a) => flagged.has(a));
 }
 
-/**
- * Returns allergen keys the user has flagged that only appear on a
- * product's "may contain traces of" cross-contact warning, not as an
- * actual ingredient. Real, distinct category on food labels — not the
- * same risk level as allergenHits() above, and shouldn't be worded the
- * same way in the UI.
- */
 function mayContainAllergenHits(product, profile) {
   const flagged = new Set(profile.allergies || []);
   return (product.mayContainAllergens || []).filter((a) => flagged.has(a));
