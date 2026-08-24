@@ -1,6 +1,10 @@
 /* Open Food Facts integration for unknown scanned barcodes.
  * Curated catalogue products remain unchanged. OFF products are adapted into
  * a separate external-result shape and never enter PRODUCTS / Market / Browse.
+ *
+ * OFF results currently support nutrition-based scoring only. The curated
+ * processing/concern-marker review is deliberately not inferred from external
+ * ingredient text, because doing so would create false precision.
  */
 
 const OFF_API_BASE = "https://world.openfoodfacts.org/api/v2/product";
@@ -42,10 +46,17 @@ function offAllergens(product) {
   const text = (product.allergens_tags || []).join(" ").toLowerCase();
   const out = [];
   const map = [
-    ["dairy", /milk|dairy/], ["soy", /soy|soya/], ["peanut", /peanut/],
-    ["tree_nuts", /nuts|almond|cashew|hazelnut|pistachio|walnut/], ["eggs", /egg/],
-    ["fish", /fish/], ["shellfish", /shellfish|crustacean|mollusc/], ["sesame", /sesame/],
-    ["wheat", /wheat|gluten/],
+    ["dairy", /milk|dairy/],
+    ["soy", /soy|soya/],
+    ["peanut", /peanut/],
+    // Match tree nuts explicitly. Do not let "peanuts" also trigger tree_nuts.
+    ["tree_nuts", /(?:^|[:\s-])nuts(?:$|[\s-])|almond|cashew|hazelnut|pistachio|walnut|pecan|macadamia|brazil[-\s]?nut/],
+    ["eggs", /egg/],
+    ["fish", /fish/],
+    ["shellfish", /shellfish|crustacean|mollusc/],
+    ["sesame", /sesame/],
+    // Generic gluten is not equivalent to wheat (it may come from barley/rye).
+    ["wheat", /wheat/],
   ];
   map.forEach(([key, rx]) => { if (rx.test(text)) out.push(key); });
   return [...new Set(out)];
@@ -61,7 +72,12 @@ function offIngredients(product) {
   }
   const text = product.ingredients_text || "";
   if (!text) return [];
-  return text.split(/[,;]+/).map((x) => x.trim()).filter(Boolean).slice(0, 60).map((name) => ({ name, flag: null, reason: "" }));
+  return text
+    .split(/[,;]+/)
+    .map((x) => x.trim())
+    .filter(Boolean)
+    .slice(0, 60)
+    .map((name) => ({ name, flag: null, reason: "" }));
 }
 
 function offConfidence(product) {
@@ -73,7 +89,9 @@ function offConfidence(product) {
   if (product.brands) points += 1;
   if (product.ingredients_text || (product.ingredients || []).length) points += 1;
   if (product.image_front_url) points += 1;
-  if (Number.isFinite(Number(product.completeness))) points += Number(product.completeness) >= 0.8 ? 2 : Number(product.completeness) >= 0.5 ? 1 : 0;
+  if (Number.isFinite(Number(product.completeness))) {
+    points += Number(product.completeness) >= 0.8 ? 2 : Number(product.completeness) >= 0.5 ? 1 : 0;
+  }
   if (points >= 10) return { level: "High", className: "high", note: "Core nutrition, identity and ingredient data are well populated in Open Food Facts." };
   if (points >= 7) return { level: "Medium", className: "medium", note: "Enough data to score, but some product fields are incomplete or community-sourced." };
   return { level: "Low", className: "low", note: "Open Food Facts has limited data for this product. Treat the result as directional." };
@@ -101,11 +119,13 @@ function adaptOpenFoodFactsProduct(code, product) {
     sugar_g: per100.sugar_g == null ? null : +(per100.sugar_g * multiplier).toFixed(1),
     satFat_g: per100.satFat_g == null ? null : +(per100.satFat_g * multiplier).toFixed(1),
     sodium_mg: per100.sodium_mg == null ? null : Math.round(per100.sodium_mg * multiplier),
-    fiber_g: per100.fiber_g == null ? 0 : +(per100.fiber_g * multiplier).toFixed(1),
-    protein_g: per100.protein_g == null ? 0 : +(per100.protein_g * multiplier).toFixed(1),
+    // Preserve missingness for display. The scoring engine treats absent
+    // positive nutrients as zero bonus without claiming the label says 0g.
+    fiber_g: per100.fiber_g == null ? null : +(per100.fiber_g * multiplier).toFixed(1),
+    protein_g: per100.protein_g == null ? null : +(per100.protein_g * multiplier).toFixed(1),
   };
 
-  const p = {
+  return {
     id: `off-${code}`,
     barcode: String(code),
     name: product.product_name || product.product_name_en || "Unknown product",
@@ -126,9 +146,9 @@ function adaptOpenFoodFactsProduct(code, product) {
     dataConfidence: offConfidence(product),
     offUrl: `https://world.openfoodfacts.org/product/${encodeURIComponent(code)}`,
     canScore,
+    scoreScope: "nutrition-only",
+    processingAssessed: false,
   };
-
-  return p;
 }
 
 async function fetchOpenFoodFactsProduct(code) {
