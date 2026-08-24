@@ -4,7 +4,7 @@ Scan any grocery barcode to get an explainable food score and see how one servin
 
 **Live demo:** https://vedantm1049.github.io/food-truth-scanner/
 
-<img width="400" height="529" alt="Food Truth Scanner barcode demo" src="https://github.com/user-attachments/assets/79ecf1d4-8d2c-4ecc-8157-bfff150984f7" />
+<img width="400" height="564" alt="FTS recording (1)" src="https://github.com/user-attachments/assets/82a2ca52-f6d1-4480-81be-866cde04c689" />
 
 ## What it does
 
