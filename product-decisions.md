@@ -20,6 +20,6 @@ The scoring thresholds themselves (sugar/saturated fat/sodium, and disabling pro
 
 Originally built as a demo concept to show what a personalized food-scoring feature could look like inside an existing health/food company's product, in conversation with a potential opportunity. Generalized and rebranded as a standalone project — Food Truth Scanner — to publish on GitHub as an independent portfolio piece, built entirely from scratch with no external company's data or IP.
 
-**What I'd measure next**
+**What I would build next**
 
 An explicit "Add to diet" action (mirroring the existing Market cart button) so a scan only counts toward the daily budget when the user actually confirms it's something they're eating, not just comparing — keeping scan-to-decide and log-to-track as two distinct, intentional actions rather than collapsing them.
