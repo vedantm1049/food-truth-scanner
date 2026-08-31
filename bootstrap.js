@@ -11,6 +11,7 @@ function bootstrapFoodTruthScanner() {
   installOpenFoodFactsUI();
   installPersonalization();
   installNutrientUI();
+  installCuratedTrust();
   installScanner();
   installBranding();
   render();
