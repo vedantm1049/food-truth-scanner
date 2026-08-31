@@ -11,10 +11,10 @@ const policy = fs.readFileSync(path.join(root, "catalog-policy.js"), "utf8");
 
 const context = {};
 vm.runInNewContext(
-  `${scoring}\n${profile}\n${data}\n${policy}\nthis.__fts = { PRODUCTS, DEFAULT_PROFILE, ALL_ALLERGENS, ACTIVITY_MULTIPLIERS, computeCaloScore };`,
+  `${scoring}\n${profile}\n${data}\n${policy}\nthis.__fts = { PRODUCTS, DEFAULT_PROFILE, ALL_ALLERGENS, ACTIVITY_MULTIPLIERS, UNSCANNABLE_PRODUCT_IDS, computeCaloScore };`,
   context
 );
-const { PRODUCTS, DEFAULT_PROFILE, ALL_ALLERGENS, ACTIVITY_MULTIPLIERS, computeCaloScore } = context.__fts;
+const { PRODUCTS, DEFAULT_PROFILE, ALL_ALLERGENS, ACTIVITY_MULTIPLIERS, UNSCANNABLE_PRODUCT_IDS, computeCaloScore } = context.__fts;
 
 function validGtin(code) {
   const raw = String(code || "");
@@ -39,9 +39,13 @@ for (const p of PRODUCTS) {
   assert.ok(!ids.has(p.id), `duplicate product id: ${p.id}`);
   ids.add(p.id);
 
-  assert.ok(validGtin(p.barcode), `invalid GTIN checksum/shape for ${p.id}: ${p.barcode}`);
-  assert.ok(!barcodes.has(p.barcode), `duplicate barcode: ${p.barcode}`);
-  barcodes.add(p.barcode);
+  if (p.barcode == null) {
+    assert.ok(UNSCANNABLE_PRODUCT_IDS.has(p.id), `barcode may only be absent for an explicitly unscannable product: ${p.id}`);
+  } else {
+    assert.ok(validGtin(p.barcode), `invalid GTIN checksum/shape for ${p.id}: ${p.barcode}`);
+    assert.ok(!barcodes.has(p.barcode), `duplicate barcode: ${p.barcode}`);
+    barcodes.add(p.barcode);
+  }
 
   assert.ok(Number.isFinite(p.servingSizeG) && p.servingSizeG > 0, `invalid serving size for ${p.id}`);
   assert.ok(p.servingLabel, `missing serving label for ${p.id}`);
