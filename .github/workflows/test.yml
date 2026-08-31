@@ -1,0 +1,33 @@
+name: Test Food Truth Scanner
+
+on:
+  push:
+    paths:
+      - "scoring.js"
+      - "scanner-runtime.js"
+      - "score-parity-runtime.js"
+      - "tests/**"
+      - ".github/workflows/test.yml"
+  pull_request:
+    paths:
+      - "scoring.js"
+      - "scanner-runtime.js"
+      - "score-parity-runtime.js"
+      - "tests/**"
+      - ".github/workflows/test.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Check runtime syntax
+        run: |
+          node --check scoring.js
+          node --check scanner-runtime.js
+          node --check score-parity-runtime.js
+      - name: Run scoring parity regression test
+        run: node tests/scoring-parity.test.js
