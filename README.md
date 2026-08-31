@@ -7,19 +7,21 @@ Scan a grocery barcode to get an explainable food score and see how one serving 
 ## What it does
 
 - Scan a retail food barcode with the camera or enter it manually.
-- Curated catalogue products use hand-researched nutrition, ingredient and allergen data.
+- Curated catalogue products use hand-researched nutrition, ingredient and allergen data, with an explicit evidence-confidence label on every result.
 - Unknown barcodes are looked up through Open Food Facts.
 - The 0–100 Food Truth Score is deterministic and **comprehensive across both data paths**: nutrition plus standardized processing / ingredient signals.
 - Open Food Facts results use ingredient data, NOVA classification and additive metadata when available; if processing evidence is too incomplete to assess fairly, the score is marked unavailable rather than treating the product as clean.
-- External results show a **data-confidence indicator** because community product records vary in completeness.
+- Both curated and external results make evidence confidence visible instead of presenting every data point as equally certain.
 - A separate **For You** layer shows how one serving contributes to relevant daily targets such as calories, protein and sodium. Users can optionally set their own total-sugar target; recommended mode does not invent one from free/added-sugar guidance.
-- Contains and trace/cross-contact allergens are surfaced independently of the score.
+- Contains and trace/cross-contact allergens are surfaced independently of the score, with wheat and gluten kept as distinct profile signals.
 
 ## Two data paths, one comprehensive scoring model
 
 ### Curated catalogue
 
-The bundled catalogue contains hand-researched products with nutrition, ingredient and allergen data checked against brand, retailer and/or barcode-specific sources. Those ingredient records feed the shared processing classifier used by the numeric score.
+The bundled catalogue contains hand-researched products with nutrition, ingredient and allergen data checked against brand, retailer, physical-label and/or barcode-specific sources where available. Not every record has the same evidence quality: some products contain clearly documented estimates or proxy/reference data where SKU-level disclosure was unavailable. The result UI therefore carries a **curated data-confidence label**. Low-confidence scores are explicitly described as directional rather than label-level certainty.
+
+Those ingredient records feed the same shared processing classifier used by the numeric score. Products whose research record contains a known dummy barcode remain browseable but are deliberately unscannable in the active application.
 
 ### Open Food Facts lookup
 
@@ -57,7 +59,7 @@ Related additives are grouped so one type of processing signal cannot inflate th
 
 Curated products provide manually researched ingredient evidence. Open Food Facts products provide ingredient records plus NOVA and additive metadata where available. NOVA 4 is used as fallback processing evidence when richer ingredient/additive evidence is absent rather than as an extra OFF-only penalty. The evidence source can differ; the **scoring dimensions and classifier are the same**.
 
-The implementation is in `scoring.js`. Regression tests cover both the scoring parity rules and the Open Food Facts adapter.
+The implementation is in `scoring.js`. Regression tests cover scoring parity, the Open Food Facts adapter, barcode validation, curated catalogue integrity and browser composition.
 
 ## Personalization
 
@@ -69,7 +71,9 @@ The app shows how one serving contributes to the configured targets without pret
 
 ## Barcode scanning
 
-The camera scanner is deliberately constrained to retail barcode formats: EAN-13, EAN-8, UPC-A, UPC-E and ITF. Manual lookup accepts 8-, 12-, 13- or 14-digit retail codes. The scanner prefers the rear camera, normalizes UPC/EAN leading-zero variants, safely shuts the camera down before navigation, and falls back to manual entry when camera access is unavailable.
+The camera scanner is deliberately constrained to retail barcode formats: EAN-13, EAN-8, UPC-A, UPC-E and ITF. Manual lookup accepts 8-, 12-, 13- or 14-digit retail codes **only when the GTIN checksum is valid**. The scanner prefers the rear camera, normalizes valid UPC/EAN leading-zero variants, safely shuts the camera down before navigation, and falls back to manual entry when camera access is unavailable.
+
+The active catalogue also normalizes known recoverable UPC leading-zero omissions while stripping explicitly documented dummy identifiers from the scan path. This prevents a prototype placeholder from masquerading as a real retail barcode.
 
 The scanner library uses a primary CDN with a fallback CDN. Camera access still depends on browser support, HTTPS and user permissions, so a real-device camera test remains necessary for each target browser/device combination.
 
@@ -94,6 +98,8 @@ Run the regression checks with:
 ```bash
 node tests/scoring-parity.test.js
 node tests/off-adapter.test.js
+node tests/scanner.test.js
+node tests/data-integrity.test.js
 node tests/architecture.test.js
 ```
 
@@ -106,29 +112,33 @@ app.js                        Base UI, routing and curated-product interaction
 scoring.js                    Deterministic scoring + shared processing classifier
 profile.js                    Recommended/custom daily target calculator
 data.js                       Curated product research dataset
-catalog-policy.js             Explicit active-catalogue exclusions
+catalog-policy.js             Active-catalogue identifier/safety normalization
 open-food-facts.js            Open Food Facts adapter + evidence normalization
 methodology.js                Methodology presentation feature
 open-food-facts-ui.js         External lookup state + safe result presentation
 personalization-feature.js    Shared For You + daily target settings feature
 nutrient-ui.js                Nutrient-density presentation feature
-scanner.js                    Retail barcode/camera lifecycle feature
+curated-trust.js              Curated evidence-confidence presentation
+scanner.js                    Retail barcode validation + camera lifecycle
 branding.js                   Product-brand presentation feature
 styles.css                    Base application styles
-off-styles.css                Open Food Facts presentation styles
+off-styles.css                Shared confidence/OFF presentation styles
 personalization-styles.css    Personalization presentation styles
-tests/                        Scoring, adapter and architecture regression checks
+tests/                        Scoring, adapter, barcode, data and architecture checks
 ```
 
 ## Data and trust principles
 
-- Curated products always win for known barcodes.
+- Curated products win for known, verified active barcodes.
+- Curated evidence confidence is visible; proxy/estimated data is not presented as equivalent to label-verified data.
 - External records are clearly labeled as Open Food Facts data.
 - Both sources use the same nutrition and processing scoring dimensions.
 - Missing OFF processing evidence is never interpreted as “no processing concerns.”
 - Missing nutrition data is preserved as missing rather than fabricated as zero.
 - External community-maintained text is escaped before rendering, and image URLs are restricted to HTTP(S).
 - A network/API failure is not presented as “barcode not found.”
+- Dummy curated identifiers are excluded from the scan path; scannable identifiers must pass a GTIN checksum.
+- Wheat and gluten are separate safety preferences: wheat implies a gluten warning, while barley/gluten evidence does not create a false wheat-allergy warning.
 - Contains and trace allergens are separate safety information and never affect the numeric score.
 - Product scoring is deterministic and inspectable rather than generated by an LLM.
 - The score is a prototype decision-support model, not clinical or medical advice.
