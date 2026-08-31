@@ -8,13 +8,22 @@ let _scannerHandlingResult = false;
 
 function normalizeScannedBarcode(code) {
   const raw = String(code || "").trim();
-  const digits = raw.replace(/[^0-9]/g, "");
-  return digits.length >= 8 ? digits : raw;
+  if (!/^\d+$/.test(raw)) return "";
+  return [8, 12, 13, 14].includes(raw.length) ? raw : "";
+}
+
+function scannerInvalidBarcode() {
+  state.scanActive = false;
+  state.manualEntryOpen = true;
+  state.scannerError = "Enter a retail barcode with 8, 12, 13 or 14 digits.";
+  render();
+  setTimeout(() => document.getElementById("manual-barcode-input")?.focus(), 50);
 }
 
 const _scannerBaseGetProductByBarcode = getProductByBarcode;
 getProductByBarcode = function(code) {
   const normalized = normalizeScannedBarcode(code);
+  if (!normalized) return undefined;
   let product = _scannerBaseGetProductByBarcode(normalized);
   if (product) return product;
 
@@ -33,7 +42,12 @@ getProductByBarcode = function(code) {
 
 const _scannerBaseHandleScanResult = handleScanResult;
 handleScanResult = async function(code) {
-  return _scannerBaseHandleScanResult(normalizeScannedBarcode(code));
+  const normalized = normalizeScannedBarcode(code);
+  if (!normalized) {
+    scannerInvalidBarcode();
+    return;
+  }
+  return _scannerBaseHandleScanResult(normalized);
 };
 
 function scannerFormats() {
@@ -43,8 +57,6 @@ function scannerFormats() {
     Html5QrcodeSupportedFormats.EAN_8,
     Html5QrcodeSupportedFormats.UPC_A,
     Html5QrcodeSupportedFormats.UPC_E,
-    Html5QrcodeSupportedFormats.CODE_128,
-    Html5QrcodeSupportedFormats.CODE_39,
     Html5QrcodeSupportedFormats.ITF,
   ].filter((x) => x != null);
 }
