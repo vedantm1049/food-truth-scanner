@@ -31,3 +31,5 @@ jobs:
         run: node tests/scoring-parity.test.js
       - name: Run Open Food Facts adapter regressions
         run: node tests/off-adapter.test.js
+      - name: Guard browser composition architecture
+        run: node tests/architecture.test.js
