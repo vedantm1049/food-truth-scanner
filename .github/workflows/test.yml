@@ -31,6 +31,8 @@ jobs:
         run: node tests/scoring-parity.test.js
       - name: Run Open Food Facts adapter regressions
         run: node tests/off-adapter.test.js
+      - name: Guard retail barcode validation
+        run: node tests/scanner.test.js
       - name: Guard curated catalogue integrity
         run: node tests/data-integrity.test.js
       - name: Guard browser composition architecture
