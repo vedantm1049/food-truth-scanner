@@ -17,7 +17,8 @@
  *   - Fiber                    up to +6
  *
  * Nutrition is normalized to 100g / 100ml. Sugar, saturated fat and sodium
- * use UK FSA front-of-pack "high in" thresholds, with stricter drink cutoffs.
+ * use UK FSA front-of-pack "high in" thresholds as anchors, with stricter
+ * drink cutoffs. The point weights themselves are prototype heuristics.
  */
 
 const CALO_SCORE_WEIGHTS = {
@@ -73,6 +74,7 @@ function clamp01(x) {
 }
 
 function safeNumber(value, fallback = 0) {
+  if (value == null || value === "") return fallback;
   const n = Number(value);
   return Number.isFinite(n) ? n : fallback;
 }
@@ -126,7 +128,10 @@ function assessProcessing(product) {
   const isExternal = Boolean(product.isOpenFoodFacts);
   const ingredients = Array.isArray(product.ingredients) ? product.ingredients : [];
   const context = product.processingContext || {};
-  const novaGroup = Number.isFinite(Number(context.novaGroup)) ? Number(context.novaGroup) : null;
+  const novaValue = context.novaGroup;
+  const novaGroup = novaValue == null || novaValue === "" || !Number.isFinite(Number(novaValue))
+    ? null
+    : Number(novaValue);
   const additiveTags = Array.isArray(context.additiveTags) ? context.additiveTags : [];
   const corpus = ingredientCorpus(product);
 
@@ -137,9 +142,22 @@ function assessProcessing(product) {
 
   const signals = [];
   for (const rule of PROCESSING_RULES) {
-    let matched = rule.pattern.test(corpus);
-    if (rule.key === "ultra_processed" && novaGroup === 4) matched = true;
+    const matched = rule.pattern.test(corpus);
     if (matched) signals.push({ key: rule.key, label: rule.label, points: rule.points });
+  }
+
+  // NOVA is valuable external evidence, but should not create an extra penalty
+  // on top of a rich ingredient record that an otherwise-equivalent curated
+  // product would not receive. Use NOVA 4 as a fallback processing signal only
+  // when OFF lacks ingredient/additive evidence capable of triggering the
+  // shared classifier directly.
+  const hasUltraSignal = signals.some((signal) => signal.key === "ultra_processed");
+  if (!hasUltraSignal && novaGroup === 4 && !hasIngredientEvidence && !hasAdditiveEvidence) {
+    signals.push({
+      key: "ultra_processed",
+      label: "Ultra-processed formulation (NOVA 4 fallback)",
+      points: 7,
+    });
   }
 
   const relevantFlaggedIngredients = countRelevantFlaggedIngredients(product);
