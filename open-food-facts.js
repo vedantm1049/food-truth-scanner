@@ -2,9 +2,10 @@
  * Curated catalogue products remain unchanged. OFF products are adapted into
  * a separate external-result shape and never enter PRODUCTS / Market / Browse.
  *
- * OFF results currently support nutrition-based scoring only. The curated
- * processing/concern-marker review is deliberately not inferred from external
- * ingredient text, because doing so would create false precision.
+ * The numeric Food Truth Score is source-neutral: curated and OFF products use
+ * the same nutrition dimensions. Ingredient / processing context is surfaced
+ * separately, with explicit provenance, so richer records do not receive an
+ * automatic scoring disadvantage.
  */
 
 const OFF_API_BASE = "https://world.openfoodfacts.org/api/v2/product";
@@ -49,13 +50,11 @@ function offAllergens(product) {
     ["dairy", /milk|dairy/],
     ["soy", /soy|soya/],
     ["peanut", /peanut/],
-    // Match tree nuts explicitly. Do not let "peanuts" also trigger tree_nuts.
     ["tree_nuts", /(?:^|[:\s-])nuts(?:$|[\s-])|almond|cashew|hazelnut|pistachio|walnut|pecan|macadamia|brazil[-\s]?nut/],
     ["eggs", /egg/],
     ["fish", /fish/],
     ["shellfish", /shellfish|crustacean|mollusc/],
     ["sesame", /sesame/],
-    // Generic gluten is not equivalent to wheat (it may come from barley/rye).
     ["wheat", /wheat/],
   ];
   map.forEach(([key, rx]) => { if (rx.test(text)) out.push(key); });
@@ -78,6 +77,24 @@ function offIngredients(product) {
     .filter(Boolean)
     .slice(0, 60)
     .map((name) => ({ name, flag: null, reason: "" }));
+}
+
+function offProcessingContext(product) {
+  const novaRaw = offNumber(product.nova_group);
+  const novaGroup = novaRaw && novaRaw >= 1 && novaRaw <= 4 ? Math.round(novaRaw) : null;
+  const additiveTags = Array.isArray(product.additives_tags) ? product.additives_tags.filter(Boolean) : [];
+  const additiveCount = additiveTags.length;
+  const notes = [];
+  if (novaGroup === 4) notes.push("Open Food Facts classifies this product as NOVA 4 (ultra-processed).");
+  else if (novaGroup) notes.push(`Open Food Facts lists this as NOVA ${novaGroup}.`);
+  if (additiveCount) notes.push(`${additiveCount} additive tag${additiveCount === 1 ? " is" : "s are"} listed in the external record.`);
+  return {
+    novaGroup,
+    additiveCount,
+    additiveTags,
+    note: notes.join(" "),
+    available: Boolean(novaGroup || additiveCount),
+  };
 }
 
 function offConfidence(product) {
@@ -119,8 +136,6 @@ function adaptOpenFoodFactsProduct(code, product) {
     sugar_g: per100.sugar_g == null ? null : +(per100.sugar_g * multiplier).toFixed(1),
     satFat_g: per100.satFat_g == null ? null : +(per100.satFat_g * multiplier).toFixed(1),
     sodium_mg: per100.sodium_mg == null ? null : Math.round(per100.sodium_mg * multiplier),
-    // Preserve missingness for display. The scoring engine treats absent
-    // positive nutrients as zero bonus without claiming the label says 0g.
     fiber_g: per100.fiber_g == null ? null : +(per100.fiber_g * multiplier).toFixed(1),
     protein_g: per100.protein_g == null ? null : +(per100.protein_g * multiplier).toFixed(1),
   };
@@ -142,11 +157,12 @@ function adaptOpenFoodFactsProduct(code, product) {
     concernMarkers: [],
     positiveFlags: [],
     ingredients: offIngredients(product),
+    processingContext: offProcessingContext(product),
     verdict: canScore ? "" : "Score unavailable because Open Food Facts is missing sugar, saturated fat or sodium data for this barcode.",
     dataConfidence: offConfidence(product),
     offUrl: `https://world.openfoodfacts.org/product/${encodeURIComponent(code)}`,
     canScore,
-    scoreScope: "nutrition-only",
+    scoreScope: "source-neutral-nutrition",
     processingAssessed: false,
   };
 }
@@ -155,7 +171,7 @@ async function fetchOpenFoodFactsProduct(code) {
   const fields = [
     "code","product_name","product_name_en","brands","quantity","serving_size",
     "image_front_url","image_url","nutriments","ingredients","ingredients_text",
-    "allergens_tags","categories_tags","completeness"
+    "allergens_tags","categories_tags","completeness","nova_group","additives_tags"
   ].join(",");
   const url = `${OFF_API_BASE}/${encodeURIComponent(code)}.json?fields=${encodeURIComponent(fields)}`;
   const response = await fetch(url, { headers: { Accept: "application/json" } });
