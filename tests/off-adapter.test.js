@@ -6,8 +6,8 @@ const vm = require("vm");
 const scoring = fs.readFileSync(path.join(__dirname, "..", "scoring.js"), "utf8");
 const off = fs.readFileSync(path.join(__dirname, "..", "open-food-facts.js"), "utf8");
 const context = { URL };
-vm.runInNewContext(`${scoring}\n${off}\nthis.__off = { offNumber, offCategory, offIngredients, offProcessingContext, adaptOpenFoodFactsProduct };`, context);
-const { offNumber, offCategory, offIngredients, offProcessingContext, adaptOpenFoodFactsProduct } = context.__off;
+vm.runInNewContext(`${scoring}\n${off}\nthis.__off = { offNumber, offCategory, offIngredients, offProcessingContext, offMapAllergenTags, adaptOpenFoodFactsProduct };`, context);
+const { offNumber, offCategory, offIngredients, offProcessingContext, offMapAllergenTags, adaptOpenFoodFactsProduct } = context.__off;
 
 assert.strictEqual(offNumber(null), null, "null OFF nutrient must stay missing rather than become 0");
 assert.strictEqual(offNumber(""), null, "empty OFF nutrient must stay missing rather than become 0");
@@ -22,6 +22,13 @@ assert.strictEqual(
   offCategory({ categories_tags: ["en:beverages", "en:orange-juices"] }),
   "beverages"
 );
+
+const wheatAllergens = offMapAllergenTags(["en:wheat"]);
+assert.ok(wheatAllergens.includes("wheat"), "wheat must remain a distinct allergy signal");
+assert.ok(wheatAllergens.includes("gluten"), "wheat must also protect a gluten-sensitive profile");
+const barleyAllergens = offMapAllergenTags(["en:barley"]);
+assert.ok(barleyAllergens.includes("gluten"), "barley must trigger gluten");
+assert.ok(!barleyAllergens.includes("wheat"), "barley must not be misrepresented as wheat");
 
 const nestedIngredients = offIngredients({
   ingredients: [
