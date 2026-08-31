@@ -3,23 +3,15 @@ name: Test Food Truth Scanner
 on:
   push:
     paths:
-      - "scoring.js"
-      - "open-food-facts.js"
-      - "off-runtime.js"
-      - "scanner-runtime.js"
-      - "score-parity-runtime.js"
-      - "index.html"
+      - "*.js"
       - "tests/**"
+      - "index.html"
       - ".github/workflows/test.yml"
   pull_request:
     paths:
-      - "scoring.js"
-      - "open-food-facts.js"
-      - "off-runtime.js"
-      - "scanner-runtime.js"
-      - "score-parity-runtime.js"
-      - "index.html"
+      - "*.js"
       - "tests/**"
+      - "index.html"
       - ".github/workflows/test.yml"
 
 jobs:
@@ -32,10 +24,10 @@ jobs:
           node-version: "22"
       - name: Check runtime syntax
         run: |
-          node --check scoring.js
-          node --check open-food-facts.js
-          node --check off-runtime.js
-          node --check scanner-runtime.js
-          node --check score-parity-runtime.js
-      - name: Run scoring parity regression test
+          for file in *.js; do
+            node --check "$file"
+          done
+      - name: Run scoring parity regressions
         run: node tests/scoring-parity.test.js
+      - name: Run Open Food Facts adapter regressions
+        run: node tests/off-adapter.test.js
