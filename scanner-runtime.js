@@ -6,6 +6,36 @@
 let _scannerRunId = 0;
 let _scannerHandlingResult = false;
 
+function normalizeScannedBarcode(code) {
+  const raw = String(code || "").trim();
+  const digits = raw.replace(/[^0-9]/g, "");
+  return digits.length >= 8 ? digits : raw;
+}
+
+const _scannerBaseGetProductByBarcode = getProductByBarcode;
+getProductByBarcode = function(code) {
+  const normalized = normalizeScannedBarcode(code);
+  let product = _scannerBaseGetProductByBarcode(normalized);
+  if (product) return product;
+
+  // UPC-A and EAN-13 can represent the same retail barcode with or without
+  // a leading zero. Try both forms before treating the barcode as external.
+  if (/^\d{12}$/.test(normalized)) {
+    product = _scannerBaseGetProductByBarcode(`0${normalized}`);
+    if (product) return product;
+  }
+  if (/^0\d{12}$/.test(normalized)) {
+    product = _scannerBaseGetProductByBarcode(normalized.slice(1));
+    if (product) return product;
+  }
+  return undefined;
+};
+
+const _scannerBaseHandleScanResult = handleScanResult;
+handleScanResult = async function(code) {
+  return _scannerBaseHandleScanResult(normalizeScannedBarcode(code));
+};
+
 function scannerFormats() {
   if (typeof Html5QrcodeSupportedFormats === "undefined") return undefined;
   return [
@@ -81,7 +111,7 @@ startCameraScan = async function() {
     const formats = scannerFormats();
     html5QrInstance = formats?.length
       ? new Html5Qrcode("qr-reader", { formatsToSupport: formats }, false)
-      : new Html5Qrcode("qr-reader", false);
+      : new Html5Qrcode("qr-reader");
 
     await html5QrInstance.start(
       { facingMode: { ideal: "environment" } },
@@ -98,7 +128,7 @@ startCameraScan = async function() {
       async (decodedText) => {
         if (_scannerHandlingResult || runId !== _scannerRunId) return;
         _scannerHandlingResult = true;
-        const normalized = String(decodedText || "").replace(/\s+/g, "").trim();
+        const normalized = normalizeScannedBarcode(decodedText);
         if (!normalized) {
           _scannerHandlingResult = false;
           return;
@@ -119,6 +149,16 @@ startCameraScan = async function() {
     render();
     setTimeout(() => document.getElementById("manual-barcode-input")?.focus(), 50);
   }
+};
+
+const _scannerBaseCloseOverlay = closeOverlay;
+closeOverlay = async function() {
+  if (state.overlay?.type === "scan" || html5QrInstance) {
+    _scannerRunId += 1;
+    await safelyStopScanner();
+    state.scanActive = false;
+  }
+  return _scannerBaseCloseOverlay();
 };
 
 const _scannerBaseRenderScanOverlay = renderScanOverlay;
