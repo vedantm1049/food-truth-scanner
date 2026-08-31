@@ -1,5 +1,6 @@
 /* Runtime bridge for Open Food Facts.
- * External products stay separate from the curated Market catalogue.
+ * External products stay separate from the curated Market catalogue while
+ * using the same source-neutral Food Truth Score when core nutrition exists.
  */
 
 const _foodTruthOriginalRender = render;
@@ -7,8 +8,6 @@ const _foodTruthOriginalHandleScanResult = handleScanResult;
 const _foodTruthOriginalCloseOverlay = closeOverlay;
 let _offLookupToken = 0;
 
-// Closing an OFF loading/result screen invalidates any in-flight lookup so an
-// async response cannot reopen a result after the user has dismissed it.
 closeOverlay = function() {
   _offLookupToken += 1;
   return _foodTruthOriginalCloseOverlay();
@@ -34,7 +33,7 @@ function offScoreScopeHTML(p) {
   if (!p.canScore) return "";
   return `<div class="panel">
     <div class="panel-title">Score scope</div>
-    <div class="panel-sub" style="margin-bottom:0;">This external result is a <b>nutrition-based score</b> using sugar, saturated fat, sodium, protein and fiber data from Open Food Facts. The curated catalogue's manually reviewed processing/ingredient-marker penalty is not applied to external products, because Food Truth Scanner has not independently reviewed this ingredient list.</div>
+    <div class="panel-sub" style="margin-bottom:0;">This barcode uses the <b>same source-neutral nutrition score</b> as curated products. Ingredient and processing context is shown separately and never changes the 0–100 score, because external ingredient records can be incomplete or community-maintained.</div>
   </div>`;
 }
 
@@ -118,7 +117,7 @@ function renderOffResultOverlay(p) {
   return `<div class="overlay">
     <div class="overlay-header"><div class="close-btn" onclick="closeOverlay()">${ICONS.close}</div></div>
     <div class="overlay-body">
-      <div class="off-source-banner">External barcode result · ${result ? "Nutrition-based score · " : ""}Data from Open Food Facts</div>
+      <div class="off-source-banner">External barcode result · ${result ? "Food Truth Score · " : ""}Data from Open Food Facts</div>
       ${hits.length ? `<div class="allergen-banner">${ICONS.alert}<div><div class="title">Contains ${hits.map((a) => ALLERGEN_LABELS[a]).join(", ")}</div><div class="sub">This allergen appears in Open Food Facts and matches your profile. Verify the physical label before relying on community-sourced allergen data.</div></div></div>` : ""}
 
       <div class="result-product-head">
@@ -138,7 +137,7 @@ function renderOffResultOverlay(p) {
 
       <div class="panel">
         <div class="panel-title">Data source</div>
-        <div class="panel-sub">This product's nutrition, ingredients and allergen information comes from Open Food Facts and has not been independently verified by Food Truth Scanner.</div>
+        <div class="panel-sub">This product's nutrition, ingredients, processing classifications and allergen information come from Open Food Facts and have not been independently verified by Food Truth Scanner.</div>
       </div>
     </div>
   </div>`;
