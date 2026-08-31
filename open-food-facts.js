@@ -65,6 +65,11 @@ function offMapAllergenTags(tags) {
     ["shellfish", /shellfish|crustacean|mollusc/],
     ["sesame", /sesame/],
     ["wheat", /wheat/],
+    // Gluten is broader than wheat: barley/rye and their derivatives matter
+    // for a gluten-sensitive profile even though they must not trigger a
+    // wheat-allergy warning. Wheat itself does contain gluten, so it is also
+    // a gluten signal in this direction only.
+    ["gluten", /gluten|wheat|barley|rye|spelt|kamut|triticale/],
   ];
   map.forEach(([key, rx]) => { if (rx.test(text)) out.push(key); });
   return [...new Set(out)];
