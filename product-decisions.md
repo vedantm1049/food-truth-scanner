@@ -12,9 +12,13 @@ Never seriously considered a simpler calorie-count or binary healthy/unhealthy f
 
 **Decision & trade-off**
 
-Curated catalogue products get a full score plus manually reviewed processing/ingredient penalties; Open Food Facts (community) products get a narrower nutrition-based score with an explicit confidence indicator, and missing core data produces a "Score unavailable" state rather than a guess. This follows directly from one principle: if the underlying data quality is inconsistent, the score has to reflect that too — it doesn't make sense to show a confident score for a product whose ingredients or nutrition data haven't actually been verified.
+The 0–100 score now uses the same nutrition inputs for every product, regardless of whether the record came from the curated catalogue or Open Food Facts. Sugar, saturated fat, sodium, protein and fiber are scored on the same deterministic basis. If core nutrition fields are missing, the score is unavailable rather than guessed.
 
-The scoring thresholds themselves (sugar/saturated fat/sodium, and disabling protein/fiber bonus points once any of those crosses "high") follow the UK FSA's published methodology directly, not a custom formula — the goal was a defensible, external standard, not a proprietary scoring trick. Open to tuning later, but the baseline is deliberately not self-invented.
+Ingredient and processing context is intentionally kept outside the numeric score. Curated products often have manually researched ingredient detail while community-maintained external records can be incomplete. Penalizing processing only where richer data exists creates a source bias: two nutritionally identical products could receive different scores simply because one was researched more thoroughly. The parity rule is therefore explicit: **identical nutrition must produce an identical numeric score regardless of source.**
+
+This does mean the score is narrower than a fully verified ingredient-quality model. The trade-off is deliberate. Ingredient quality, processing context, allergens and data confidence are still surfaced clearly alongside the score, but are not allowed to distort comparability until the same level of ingredient evidence can be established across products.
+
+The nutrition thresholds themselves (sugar/saturated fat/sodium, and disabling protein/fiber bonus points once any of those crosses "high") follow the UK FSA's published methodology directly, not a custom threshold system. The goal is a defensible baseline rather than a proprietary black box.
 
 **Outcome**
 
@@ -22,4 +26,4 @@ Originally built as a demo concept to show what a personalized food-scoring feat
 
 **What I would build next**
 
-An explicit "Add to diet" action (mirroring the existing Market cart button) so a scan only counts toward the daily budget when the user actually confirms it's something they're eating, not just comparing — keeping scan-to-decide and log-to-track as two distinct, intentional actions rather than collapsing them.
+A stronger ingredient-processing layer based on a source-independent structured taxonomy, applied only when sufficient ingredient evidence exists for every product being compared. I would also add an explicit "Add to diet" action so a scan only counts toward a daily budget when the user confirms it is something they are actually eating, keeping scan-to-decide and log-to-track as two distinct actions.
