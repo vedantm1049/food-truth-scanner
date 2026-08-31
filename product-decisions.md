@@ -1,29 +1,31 @@
 **Problem**
 
-Existing global barcode/nutrition apps either give a single opaque score with no explanation, or drown the user in raw nutrition data they have to interpret themselves. Neither tells you clearly whether a product is a problem for you specifically, or whether the app is even confident in the data it's using. Nothing like this exists in the GCC market at all, and even established global players like Yuka and TruthIn don't have a personalization layer.
+Existing barcode and nutrition apps often either give an opaque score or overwhelm users with raw data. The harder product problem is to make the score explainable, personalized and comparable even when product evidence comes from different sources.
 
 **Who it's for**
 
-Someone standing in a supermarket aisle deciding between two products, who wants a fast, explainable answer, not a research project.
-
-**Options considered**
-
-Never seriously considered a simpler calorie-count or binary healthy/unhealthy flag — the goal from the start was a single, universal, fast-to-read score, with ingredient breakdowns and personalization available underneath for anyone who wants to go deeper, not pushed on everyone up front. Full daily food tracking (a MyFitnessPal-style "remaining budget") was considered and deliberately deferred, not ruled out — it's a heavier, later-stage feature, not part of the first build.
+Someone standing in a supermarket aisle deciding between products, who wants a fast answer with enough detail underneath to understand why.
 
 **Decision & trade-off**
 
-The 0–100 score now uses the same nutrition inputs for every product, regardless of whether the record came from the curated catalogue or Open Food Facts. Sugar, saturated fat, sodium, protein and fiber are scored on the same deterministic basis. If core nutrition fields are missing, the score is unavailable rather than guessed.
+The 0–100 Food Truth Score uses the same comprehensive scoring dimensions for curated catalogue products and Open Food Facts results: sugar, saturated fat, sodium, processing / ingredient concerns, protein and fiber.
 
-Ingredient and processing context is intentionally kept outside the numeric score. Curated products often have manually researched ingredient detail while community-maintained external records can be incomplete. Penalizing processing only where richer data exists creates a source bias: two nutritionally identical products could receive different scores simply because one was researched more thoroughly. The parity rule is therefore explicit: **identical nutrition must produce an identical numeric score regardless of source.**
+The key parity decision is not to remove processing from curated products. Instead, both data paths feed a shared deterministic processing classifier. Curated products provide manually researched ingredient evidence; Open Food Facts products provide ingredients plus NOVA and additive metadata when available.
 
-This does mean the score is narrower than a fully verified ingredient-quality model. The trade-off is deliberate. Ingredient quality, processing context, allergens and data confidence are still surfaced clearly alongside the score, but are not allowed to distort comparability until the same level of ingredient evidence can be established across products.
+The processing classifier groups evidence into standardized categories such as ultra-processed / reconstituted formulation, non-nutritive sweeteners and sugar alcohols, preservatives, emulsifiers / stabilizers, artificial colours / flavours, and unusually high additive load. Related additives are grouped so repeated variants of the same processing signal do not unfairly stack points.
 
-The nutrition thresholds themselves (sugar/saturated fat/sodium, and disabling protein/fiber bonus points once any of those crosses "high") follow the UK FSA's published methodology directly, not a custom threshold system. The goal is a defensible baseline rather than a proprietary black box.
+Allergens remain separate safety information. Nutrition warnings such as high saturated fat are already captured numerically and are not counted again as processing penalties.
+
+The important missing-data rule is: **missing processing evidence is not evidence of a clean product.** An Open Food Facts result only receives a numeric score when core nutrition fields are available and there is enough ingredient, NOVA or additive evidence to assess processing. Otherwise the app shows Score unavailable and explains why.
+
+This makes the two evidence sources different but the scoring model the same. Confidence remains explicit because Open Food Facts is community-maintained and evidence completeness varies by barcode.
+
+The nutrition thresholds for sugar, saturated fat and sodium follow the UK FSA front-of-pack methodology, including stricter drink thresholds. Protein and fiber bonuses are disabled once any negative nutrition axis reaches its high threshold.
 
 **Outcome**
 
-Originally built as a demo concept to show what a personalized food-scoring feature could look like inside an existing health/food company's product, in conversation with a potential opportunity. Generalized and rebranded as a standalone project — Food Truth Scanner — to publish on GitHub as an independent portfolio piece, built entirely from scratch with no external company's data or IP.
+Food Truth Scanner now treats scoring parity as an evidence-normalization problem rather than solving it by narrowing the score. The result is a more comprehensive score for external products without reducing the depth of the curated catalogue.
 
 **What I would build next**
 
-A stronger ingredient-processing layer based on a source-independent structured taxonomy, applied only when sufficient ingredient evidence exists for every product being compared. I would also add an explicit "Add to diet" action so a scan only counts toward a daily budget when the user confirms it is something they are actually eating, keeping scan-to-decide and log-to-track as two distinct actions.
+Expand the processing taxonomy against a much larger labelled product set, validate category weights against nutrition experts and real-world product comparisons, and add an explicit Add to diet action so scan-to-decide and log-to-track remain separate behaviors.
