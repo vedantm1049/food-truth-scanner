@@ -1,9 +1,20 @@
 /** Food Truth Scanner — retail barcode scanner feature. */
 
+function isValidRetailBarcode(code) {
+  const raw = String(code || "").trim();
+  if (!/^\d+$/.test(raw) || ![8, 12, 13, 14].includes(raw.length)) return false;
+  const digits = raw.split("").map(Number);
+  const check = digits.pop();
+  const total = digits.reverse().reduce(
+    (sum, digit, index) => sum + digit * (index % 2 === 0 ? 3 : 1),
+    0
+  );
+  return (10 - (total % 10)) % 10 === check;
+}
+
 function normalizeScannedBarcode(code) {
   const raw = String(code || "").trim();
-  if (!/^\d+$/.test(raw)) return "";
-  return [8, 12, 13, 14].includes(raw.length) ? raw : "";
+  return isValidRetailBarcode(raw) ? raw : "";
 }
 
 function scannerFormats() {
@@ -40,7 +51,7 @@ function installScanner() {
   function invalidBarcode() {
     state.scanActive = false;
     state.manualEntryOpen = true;
-    state.scannerError = "Enter a retail barcode with 8, 12, 13 or 14 digits.";
+    state.scannerError = "Enter a valid retail barcode (EAN/UPC/GTIN) with 8, 12, 13 or 14 digits.";
     render();
     setTimeout(() => document.getElementById("manual-barcode-input")?.focus(), 50);
   }
@@ -52,12 +63,18 @@ function installScanner() {
     let product = baseGetProductByBarcode(normalized);
     if (product) return product;
     if (/^\d{12}$/.test(normalized)) {
-      product = baseGetProductByBarcode(`0${normalized}`);
-      if (product) return product;
+      const ean = `0${normalized}`;
+      if (isValidRetailBarcode(ean)) {
+        product = baseGetProductByBarcode(ean);
+        if (product) return product;
+      }
     }
     if (/^0\d{12}$/.test(normalized)) {
-      product = baseGetProductByBarcode(normalized.slice(1));
-      if (product) return product;
+      const upc = normalized.slice(1);
+      if (isValidRetailBarcode(upc)) {
+        product = baseGetProductByBarcode(upc);
+        if (product) return product;
+      }
     }
     return undefined;
   };
