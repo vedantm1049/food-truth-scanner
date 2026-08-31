@@ -25,11 +25,12 @@ const UNSCANNABLE_PRODUCT_IDS = new Set([
   "soul-pantry-tuscan-tomato-chips-50g",
 ]);
 
-// Recoverable identifier normalization. The source image / OFF identifier for
-// this Rubicon SKU is 0064579330753, equivalent to UPC-A 064579330753. The
-// original research record dropped the leading zero.
+// Recoverable identifier normalization where the historical research record
+// dropped a UPC-A leading zero. Keep that record unchanged; correct the active
+// application identity here.
 const BARCODE_CORRECTIONS = new Map([
   ["rubicon-coconut-water-250ml", "064579330753"],
+  ["cheetos-flamin-hot-crunchy-28g", "028400037174"],
 ]);
 
 function applyCatalogPolicy(products = PRODUCTS) {
