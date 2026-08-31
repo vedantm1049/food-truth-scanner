@@ -31,3 +31,19 @@ if (typeof offScoreScopeHTML === "function") {
     </div>`;
   };
 }
+
+if (typeof offConfidenceHTML === "function") {
+  const _sourceNeutralConfidenceHTML = offConfidenceHTML;
+  offConfidenceHTML = function(p) {
+    const base = _sourceNeutralConfidenceHTML(p);
+    const context = p.processingContext;
+    if (!context?.available) return base;
+    const nova = context.novaGroup ? `<div class="flag-row ${context.novaGroup === 4 ? "negative" : ""}"><div class="dot"></div><div>NOVA ${context.novaGroup}${context.novaGroup === 4 ? " · ultra-processed" : ""}</div></div>` : "";
+    const additives = context.additiveCount ? `<div class="flag-row"><div class="dot"></div><div>${context.additiveCount} additive tag${context.additiveCount === 1 ? "" : "s"} listed by Open Food Facts</div></div>` : "";
+    return `${base}<div class="panel">
+      <div class="panel-title">Processing context</div>
+      <div class="panel-sub">External classification from Open Food Facts. Shown for transparency; it does not change the numeric score.</div>
+      ${nova}${additives}
+    </div>`;
+  };
+}
