@@ -25,6 +25,7 @@ const requiredFeatureFiles = [
   "open-food-facts-ui.js",
   "personalization-feature.js",
   "nutrient-ui.js",
+  "curated-trust.js",
   "scanner.js",
   "branding.js",
   "bootstrap.js",
@@ -40,6 +41,7 @@ for (const installer of [
   "installOpenFoodFactsUI()",
   "installPersonalization()",
   "installNutrientUI()",
+  "installCuratedTrust()",
   "installScanner()",
   "installBranding()",
 ]) {
