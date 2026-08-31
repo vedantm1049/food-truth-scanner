@@ -18,8 +18,12 @@ function forYouSummary(product, targets, profile) {
 
   const high = ["sugar_g", "sodium_mg"].filter((key) => pct[key] != null && pct[key] >= 35);
 
-  if (profile.goal === "build_muscle" && pct.protein_g != null && pct.protein_g >= 20 && (pct.calories == null || pct.calories <= 20)) {
-    return `Strong protein contribution for your muscle-building goal: ${pct.protein_g}% of your daily protein target for ${pct.calories || 0}% of daily calories.`;
+  if (
+    profile.goal === "build_muscle" &&
+    pct.protein_g != null && pct.protein_g >= 20 &&
+    pct.calories != null && pct.calories <= 20
+  ) {
+    return `Strong protein contribution for your muscle-building goal: ${pct.protein_g}% of your daily protein target for ${pct.calories}% of daily calories.`;
   }
   if (profile.goal === "lose_weight" && pct.calories != null && pct.calories <= 12 && !high.length) {
     return `A relatively light serving at ${pct.calories}% of your daily calorie target.`;
@@ -30,7 +34,7 @@ function forYouSummary(product, targets, profile) {
     return `Relatively high in ${label}: ${pct[high[0]]}% of your daily target in one serving.`;
   }
   if (pct.protein_g != null && pct.protein_g >= 20) {
-    return `Good protein contribution at ${pct.protein_g}% of your daily target, while staying moderate on sugar and sodium.`;
+    return `Good protein contribution at ${pct.protein_g}% of your daily target.`;
   }
   return "A moderate contribution to your daily targets; the bars below show how much one serving accounts for.";
 }
@@ -49,13 +53,17 @@ function renderForYouPanel(product) {
   const targets = computeDailyTargets(state.profile);
   const summary = forYouSummary(product, targets, state.profile);
   const mode = state.profile.targetMode === "custom" ? "Using your custom daily targets." : "Using recommended daily targets from your profile.";
+  const sugarNote = state.profile.targetMode !== "custom"
+    ? `<div class="panel-sub" style="margin-top:8px;">Total sugar is shown in the nutrition panel but not compared with a recommended daily limit, because product labels report total sugar while common public-health limits apply to free/added sugar.</div>`
+    : "";
   return `<div class="panel for-you-panel">
     <div class="panel-title">For You</div>
     <div class="panel-sub">${summary}<br>${mode}</div>
     ${dailyTargetBar("Calories", product.nutrition.calories, targets.calories, " kcal")}
     ${dailyTargetBar("Sugar", product.nutrition.sugar_g, targets.sugar_g, "g")}
-    ${product.nutrition.protein_g != null ? dailyTargetBar("Protein", product.nutrition.protein_g, targets.protein_g, "g") : ""}
+    ${dailyTargetBar("Protein", product.nutrition.protein_g, targets.protein_g, "g")}
     ${dailyTargetBar("Sodium", product.nutrition.sodium_mg, targets.sodium_mg, "mg")}
+    ${sugarNote}
   </div>`;
 }
 
@@ -81,8 +89,9 @@ if (typeof renderOffResultOverlay === "function") {
   };
 }
 
-function targetInput(label, key, value, unit) {
-  return `<label class="target-custom-field"><span>${label}</span><div><input type="number" value="${value}" onchange="setCustomTarget('${key}', this.value)"><small>${unit}</small></div></label>`;
+function targetInput(label, key, value, unit, placeholder = "") {
+  const safeValue = value == null ? "" : value;
+  return `<label class="target-custom-field"><span>${label}</span><div><input type="number" value="${safeValue}" placeholder="${placeholder}" onchange="setCustomTarget('${key}', this.value)"><small>${unit}</small></div></label>`;
 }
 
 function renderTargetSettings() {
@@ -96,7 +105,9 @@ function renderTargetSettings() {
       <label><input type="radio" name="target-mode" ${!custom ? "checked" : ""} onchange="setTargetMode('recommended')"> Recommended</label>
       <label><input type="radio" name="target-mode" ${custom ? "checked" : ""} onchange="setTargetMode('custom')"> Set my own</label>
     </div>
-    ${custom ? `<div class="target-custom-grid">${targetInput("Calories", "calories", active.calories, "kcal")}${targetInput("Protein", "protein_g", active.protein_g, "g")}${targetInput("Sugar limit", "sugar_g", active.sugar_g, "g")}${targetInput("Sodium limit", "sodium_mg", active.sodium_mg, "mg")}</div>` : `<div class="panel-sub" style="margin:10px 0 0;">Recommended: ${recommended.calories} kcal · ${recommended.protein_g}g protein · ${recommended.sugar_g}g sugar · ${recommended.sodium_mg}mg sodium</div>`}
+    ${custom
+      ? `<div class="target-custom-grid">${targetInput("Calories", "calories", active.calories, "kcal")}${targetInput("Protein", "protein_g", active.protein_g, "g")}${targetInput("Total sugar limit", "sugar_g", active.sugar_g, "g", "optional")}${targetInput("Sodium limit", "sodium_mg", active.sodium_mg, "mg")}</div><div class="panel-sub" style="margin-top:8px;">Only set a sugar limit here if you intentionally want to track <b>total</b> sugar from product labels.</div>`
+      : `<div class="panel-sub" style="margin:10px 0 0;">Recommended: ${recommended.calories} kcal · ${recommended.protein_g}g protein · ${recommended.sodium_mg}mg sodium. No default total-sugar target is assumed.</div>`}
   </div>`;
 }
 
@@ -104,14 +115,19 @@ function setTargetMode(mode) {
   state.profile.targetMode = mode === "custom" ? "custom" : "recommended";
   if (state.profile.targetMode === "custom" && !state.profile.customTargets) {
     const r = computeRecommendedDailyTargets(state.profile);
-    state.profile.customTargets = { calories: r.calories, protein_g: r.protein_g, sugar_g: r.sugar_g, sodium_mg: r.sodium_mg };
+    state.profile.customTargets = {
+      calories: r.calories,
+      protein_g: r.protein_g,
+      sugar_g: null,
+      sodium_mg: r.sodium_mg,
+    };
   }
   render();
 }
 
 function setCustomTarget(key, value) {
   if (!state.profile.customTargets) state.profile.customTargets = {};
-  state.profile.customTargets[key] = Number(value);
+  state.profile.customTargets[key] = value === "" ? null : Number(value);
   render();
 }
 
