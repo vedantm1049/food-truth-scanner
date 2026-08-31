@@ -83,12 +83,18 @@ function computeRecommendedDailyTargets(profile) {
   const proteinCalories = protein_g * 4;
   const carbCalories = Math.max(0, calories - proteinCalories - fatCalories);
   const carbs_g = Math.round(carbCalories / 4);
-  const sugar_g = Math.round((calories * 0.10) / 4);
+
+  // Product labels / OFF reliably expose total sugars, while common public
+  // health limits are generally defined for free/added sugars. Do not pretend
+  // those are interchangeable. Recommended mode therefore omits a daily sugar
+  // target; users who intentionally track total sugar can set one themselves.
+  const sugar_g = null;
   const sodium_mg = 2000;
   return { calories, protein_g, carbs_g, fat_g, sugar_g, sodium_mg };
 }
 
 function validCustomTarget(value, fallback, min, max) {
+  if (value == null || value === "") return fallback;
   const n = Number(value);
   if (!Number.isFinite(n) || n < min || n > max) return fallback;
   return Math.round(n);
@@ -102,7 +108,7 @@ function computeDailyTargets(profile) {
     ...recommended,
     calories: validCustomTarget(custom.calories, recommended.calories, 800, 6000),
     protein_g: validCustomTarget(custom.protein_g, recommended.protein_g, 10, 400),
-    sugar_g: validCustomTarget(custom.sugar_g, recommended.sugar_g, 5, 250),
+    sugar_g: validCustomTarget(custom.sugar_g, null, 5, 250),
     sodium_mg: validCustomTarget(custom.sodium_mg, recommended.sodium_mg, 200, 10000),
   };
 }
