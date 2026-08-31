@@ -42,6 +42,7 @@ const ALLERGEN_LABELS = {
   shellfish: "Shellfish",
   sesame: "Sesame",
   wheat: "Wheat",
+  gluten: "Gluten",
 };
 
 const ALL_ALLERGENS = Object.keys(ALLERGEN_LABELS);
