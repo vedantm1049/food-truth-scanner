@@ -97,8 +97,11 @@ function ingredientCorpus(product) {
   const additiveText = Array.isArray(product.processingContext?.additiveTags)
     ? product.processingContext.additiveTags.join(" ")
     : "";
-  const processingNote = product.processingContext?.note || "";
-  return normalizeProcessingText(`${ingredientText} ${concernText} ${additiveText} ${processingNote}`);
+  // Do not include the human-readable processingContext.note here. OFF builds
+  // that note from NOVA metadata, and feeding it back into text matching would
+  // turn NOVA into an extra source-only penalty before the explicit fallback
+  // rule below gets a chance to enforce parity.
+  return normalizeProcessingText(`${ingredientText} ${concernText} ${additiveText}`);
 }
 
 function countRelevantFlaggedIngredients(product) {
