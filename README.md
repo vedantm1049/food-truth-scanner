@@ -73,6 +73,12 @@ The camera scanner is deliberately constrained to retail barcode formats: EAN-13
 
 The scanner library uses a primary CDN with a fallback CDN. Camera access still depends on browser support, HTTPS and user permissions, so a real-device camera test remains necessary for each target browser/device combination.
 
+## Architecture
+
+The browser app intentionally has no build framework, but its runtime composition is explicit rather than relying on post-load patch files. Domain/data modules load first, the base UI shell loads next, feature modules only define installers, and `bootstrap.js` is the single composition root.
+
+This means feature order is visible in one place and modules no longer self-execute by repeatedly wrapping whatever happened to be loaded before them.
+
 ## Running it locally
 
 No build step or package installation is required:
@@ -88,24 +94,30 @@ Run the regression checks with:
 ```bash
 node tests/scoring-parity.test.js
 node tests/off-adapter.test.js
+node tests/architecture.test.js
 ```
 
 ## Project structure
 
 ```text
-index.html                    Entry point / script wiring
-app.js                        Main UI, routing and curated-product interaction
-scoring.js                    Comprehensive deterministic scoring + shared processing classifier
+index.html                    Declarative browser script wiring
+bootstrap.js                  Single application composition root
+app.js                        Base UI, routing and curated-product interaction
+scoring.js                    Deterministic scoring + shared processing classifier
 profile.js                    Recommended/custom daily target calculator
-data.js                       Curated product dataset
-catalog-overrides.js          Active catalogue removals
+data.js                       Curated product research dataset
+catalog-policy.js             Explicit active-catalogue exclusions
 open-food-facts.js            Open Food Facts adapter + evidence normalization
-off-runtime.js                External barcode lookup + safe OFF result rendering
-score-parity-runtime.js       Shared methodology UI copy
-personalization.js            Shared For You + daily target settings layer
-ui-correctness-runtime.js     Keeps nutrient-density indicators aligned with scoring
-scanner-runtime.js            Hardened retail barcode/camera lifecycle
-tests/                        Scoring and OFF adapter regression checks
+methodology.js                Methodology presentation feature
+open-food-facts-ui.js         External lookup state + safe result presentation
+personalization-feature.js    Shared For You + daily target settings feature
+nutrient-ui.js                Nutrient-density presentation feature
+scanner.js                    Retail barcode/camera lifecycle feature
+branding.js                   Product-brand presentation feature
+styles.css                    Base application styles
+off-styles.css                Open Food Facts presentation styles
+personalization-styles.css    Personalization presentation styles
+tests/                        Scoring, adapter and architecture regression checks
 ```
 
 ## Data and trust principles
