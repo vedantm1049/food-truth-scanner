@@ -2,7 +2,11 @@
 
 Scan a grocery barcode to get an explainable food score and see how one serving fits your personal nutrition targets.
 
+<img width="400" height="564" alt="Food Truth Scanner GIF" src="https://github.com/user-attachments/assets/cf9b6c28-8799-431b-936e-52340a75a446" />
+
 **Live demo:** https://vedantm1049.github.io/food-truth-scanner/
+
+[**Read the product decisions**](product-decisions.md) — the trade-offs behind scoring parity, missing-data handling, processing evidence, personalization, and where the model deliberately avoids false precision.
 
 ## What it does
 
