@@ -42,6 +42,25 @@ assert.strictEqual(
   "Equivalent ingredient evidence must not receive extra points merely because OFF also exposes NOVA metadata"
 );
 
+const offTagsOnly = product({
+  isOpenFoodFacts: true,
+  ingredients: [],
+  processingContext: {
+    novaGroup: null,
+    additiveTags: ["en:e955", "en:e202", "en:e471"],
+    additiveDataAvailable: true,
+    note: "",
+  },
+});
+const offTagsOnlyProcessing = assessProcessing(offTagsOnly);
+assert.strictEqual(offTagsOnlyProcessing.canAssess, true, "structured additive tags alone must be usable processing evidence");
+assert.strictEqual(offTagsOnlyProcessing.points, 14, "sweetener, preservative and emulsifier tags should produce their three grouped penalties");
+assert.deepStrictEqual(
+  Array.from(offTagsOnlyProcessing.signals, (signal) => signal.key),
+  ["sweeteners", "preservatives", "texture_agents"],
+  "standard OFF E-number tags must map to the same processing families as named ingredients"
+);
+
 const offNovaFallback = product({
   isOpenFoodFacts: true,
   ingredients: [],
