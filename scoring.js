@@ -32,6 +32,10 @@ const CALO_SCORE_WEIGHTS = {
 
 const DRINK_CATEGORIES = new Set(["beverages", "milk_milk_alternatives", "water_ice"]);
 
+// These patterns deliberately combine ingredient names with the standardized
+// additive identifiers commonly exposed by Open Food Facts. The classifier is
+// category-based: multiple additives of the same type trigger one signal rather
+// than stacking a separate penalty for every E-number.
 const PROCESSING_RULES = [
   {
     key: "ultra_processed",
@@ -43,25 +47,25 @@ const PROCESSING_RULES = [
     key: "sweeteners",
     label: "Non-nutritive sweeteners / sugar alcohols",
     points: 5,
-    pattern: /sucralose|aspartame|acesulfame|saccharin|neotame|advantame|maltitol|xylitol|sorbitol|erythritol|mannitol|isomalt|lactitol|steviol glycoside|\bstevia\b|artificial sweetener|sugar alcohol/i,
+    pattern: /sucralose|aspartame|acesulfame|cyclamate|saccharin|neotame|advantame|maltitol|xylitol|sorbitol|erythritol|mannitol|isomalt|lactitol|steviol glycoside|\bstevia\b|artificial sweetener|sugar alcohol|\be420\b|\be421\b|\be950\b|\be951\b|\be952\b|\be953\b|\be954\b|\be955\b|\be959\b|\be960\b|\be961\b|\be962\b|\be964\b|\be965\b|\be966\b|\be967\b|\be968\b|\be969\b/i,
   },
   {
     key: "preservatives",
     label: "Preservatives",
     points: 5,
-    pattern: /preservative|potassium sorbate|sodium benzoate|calcium propionate|butylated hydroxyanisole|\bbha\b|\bbht\b|nitrite|nitrate|sulphite|sulfite|\be202\b|\be211\b|\be212\b|\be249\b|\be250\b|\be251\b|\be252\b|\be280\b|\be281\b|\be282\b|\be283\b|\be319\b|\be320\b|\be321\b/i,
+    pattern: /preservative|potassium sorbate|sodium benzoate|calcium propionate|butylated hydroxyanisole|\bbha\b|\bbht\b|nitrite|nitrate|sulphite|sulfite|\be200\b|\be201\b|\be202\b|\be203\b|\be210\b|\be211\b|\be212\b|\be213\b|\be214\b|\be215\b|\be216\b|\be217\b|\be218\b|\be219\b|\be220\b|\be221\b|\be222\b|\be223\b|\be224\b|\be225\b|\be226\b|\be227\b|\be228\b|\be234\b|\be235\b|\be239\b|\be242\b|\be249\b|\be250\b|\be251\b|\be252\b|\be280\b|\be281\b|\be282\b|\be283\b|\be319\b|\be320\b|\be321\b/i,
   },
   {
     key: "texture_agents",
     label: "Emulsifiers / stabilizers / texture agents",
     points: 4,
-    pattern: /emulsifier|stabilizer|stabiliser|thickener|humectant|polysorbate|carrageenan|glycerol|glycerin|propylene glycol|polydextrose|mono[- ]?and diglycerides|polyglycerol ester|\be322\b|\be407\b|\be412\b|\be415\b|\be466\b|\be471\b|\be472[a-f]?\b|\be475\b/i,
+    pattern: /emulsifier|stabilizer|stabiliser|thickener|humectant|polysorbate|carrageenan|glycerol|glycerin|propylene glycol|polydextrose|mono[- ]?and diglycerides|polyglycerol ester|\be322\b|\be401\b|\be402\b|\be404\b|\be405\b|\be407\b|\be410\b|\be412\b|\be413\b|\be414\b|\be415\b|\be416\b|\be418\b|\be422\b|\be432\b|\be433\b|\be434\b|\be435\b|\be436\b|\be440\b|\be450\b|\be451\b|\be452\b|\be460\b|\be461\b|\be462\b|\be463\b|\be464\b|\be465\b|\be466\b|\be468\b|\be469\b|\be470a\b|\be470b\b|\be471\b|\be472[a-f]?\b|\be473\b|\be474\b|\be475\b|\be476\b|\be477\b|\be481\b|\be482\b/i,
   },
   {
     key: "artificial_colours_flavours",
     label: "Artificial colours / flavours",
     points: 4,
-    pattern: /artificial (?:flavou?r|colou?r)|synthetic (?:flavou?r|colou?r)|nature[- ]identical|tartrazine|sunset yellow|allura red|brilliant blue|ponceau|\be102\b|\be110\b|\be122\b|\be124\b|\be129\b|\be133\b/i,
+    pattern: /artificial (?:flavou?r|colou?r)|synthetic (?:flavou?r|colou?r)|nature[- ]identical|tartrazine|quinoline yellow|sunset yellow|azorubine|carmoisine|amaranth|ponceau|erythrosine|allura red|patent blue|indigotine|brilliant blue|green s|brilliant black|brown fk|brown ht|\be102\b|\be104\b|\be110\b|\be122\b|\be123\b|\be124\b|\be127\b|\be129\b|\be131\b|\be132\b|\be133\b|\be142\b|\be151\b|\be154\b|\be155\b/i,
   },
 ];
 
