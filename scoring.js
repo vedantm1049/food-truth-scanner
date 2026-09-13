@@ -4,27 +4,35 @@
  * Every product uses the same nutrition formula and the same processing
  * classifier. Curated products provide manually researched ingredient context;
  * Open Food Facts products provide ingredient text, NOVA and additive metadata.
- * Missing external processing evidence is never treated as a clean product —
- * the OFF adapter marks the score unavailable when the processing component
- * cannot be assessed at all.
  *
  * Score inputs:
  *   - Sugar                    up to -40
  *   - Saturated fat            up to -15
  *   - Sodium                   up to -20
+ *   - Solid-food density       up to -15
  *   - Processing / ingredients up to -25
  *   - Protein                  up to +8
  *   - Fiber                    up to +6
  *
  * Nutrition is normalized to 100g / 100ml. Sugar, saturated fat and sodium
  * use UK FSA front-of-pack "high in" thresholds as anchors, with stricter
- * drink cutoffs. The point weights themselves are prototype heuristics.
+ * drink cutoffs. Energy / total-fat density is a capped Food Truth heuristic
+ * for solid foods so fried, calorie-dense snacks are not rewarded for low sugar.
  */
 
 const CALO_SCORE_WEIGHTS = {
   sugar: { max: 40, at: 22.5, atDrink: 11.25 },
   satFat: { max: 15, at: 5, atDrink: 2.5 },
   sodium: { max: 20, at: 600, atDrink: 300 },
+  density: {
+    max: 15,
+    energyMax: 10,
+    energyStart: 250,
+    energyAt: 550,
+    fatMax: 8,
+    fatStart: 10,
+    fatAt: 35,
+  },
   concerns: { max: 25 },
   protein: { max: 8, at: 10 },
   fiber: { max: 6, at: 6 },
@@ -32,16 +40,18 @@ const CALO_SCORE_WEIGHTS = {
 
 const DRINK_CATEGORIES = new Set(["beverages", "milk_milk_alternatives", "water_ice"]);
 
-// These patterns deliberately combine ingredient names with the standardized
-// additive identifiers commonly exposed by Open Food Facts. The classifier is
-// category-based: multiple additives of the same type trigger one signal rather
-// than stacking a separate penalty for every E-number.
 const PROCESSING_RULES = [
   {
     key: "ultra_processed",
     label: "Ultra-processed / reconstituted formulation",
     points: 7,
     pattern: /\bultra[- ]processed\b|reconstitut|dehydrated potato|industrial formulation|heavily processed/i,
+  },
+  {
+    key: "fried_snack",
+    label: "Deep-fried / fried snack",
+    points: 8,
+    pattern: /deep[- ]?fried|\bfried\b|\bbhujia\b|\bsev\b|\bnamkeen\b/i,
   },
   {
     key: "sweeteners",
@@ -101,11 +111,8 @@ function ingredientCorpus(product) {
   const additiveText = Array.isArray(product.processingContext?.additiveTags)
     ? product.processingContext.additiveTags.join(" ")
     : "";
-  // Do not include the human-readable processingContext.note here. OFF builds
-  // that note from NOVA metadata, and feeding it back into text matching would
-  // turn NOVA into an extra source-only penalty before the explicit fallback
-  // rule below gets a chance to enforce parity.
-  return normalizeProcessingText(`${ingredientText} ${concernText} ${additiveText}`);
+  const productName = product.name || "";
+  return normalizeProcessingText(`${productName} ${ingredientText} ${concernText} ${additiveText}`);
 }
 
 function countRelevantFlaggedIngredients(product) {
@@ -121,16 +128,6 @@ function countRelevantFlaggedIngredients(product) {
   }).length;
 }
 
-/**
- * Builds one standardized processing assessment regardless of data source.
- *
- * Curated products: full ingredient rows + manually researched concern notes.
- * OFF products: ingredient rows + NOVA + additive tags.
- *
- * Allergens, high sugar/saturated-fat/sodium notes and portion-size comments do
- * not trigger processing points unless they independently match a processing
- * rule, preventing double-counting nutrition or safety information.
- */
 function assessProcessing(product) {
   const isExternal = Boolean(product.isOpenFoodFacts);
   const ingredients = Array.isArray(product.ingredients) ? product.ingredients : [];
@@ -145,19 +142,15 @@ function assessProcessing(product) {
   const hasIngredientEvidence = ingredients.length > 0;
   const hasNovaEvidence = novaGroup != null;
   const hasAdditiveEvidence = additiveTags.length > 0;
-  const canAssess = !isExternal || hasIngredientEvidence || hasNovaEvidence || hasAdditiveEvidence;
 
   const signals = [];
   for (const rule of PROCESSING_RULES) {
-    const matched = rule.pattern.test(corpus);
-    if (matched) signals.push({ key: rule.key, label: rule.label, points: rule.points });
+    if (rule.pattern.test(corpus)) signals.push({ key: rule.key, label: rule.label, points: rule.points });
   }
 
-  // NOVA is valuable external evidence, but should not create an extra penalty
-  // on top of a rich ingredient record that an otherwise-equivalent curated
-  // product would not receive. Use NOVA 4 as a fallback processing signal only
-  // when OFF lacks ingredient/additive evidence capable of triggering the
-  // shared classifier directly.
+  const hasRuleEvidence = signals.length > 0;
+  const canAssess = !isExternal || hasIngredientEvidence || hasNovaEvidence || hasAdditiveEvidence || hasRuleEvidence;
+
   const hasUltraSignal = signals.some((signal) => signal.key === "ultra_processed");
   if (!hasUltraSignal && novaGroup === 4 && !hasIngredientEvidence && !hasAdditiveEvidence) {
     signals.push({
@@ -170,11 +163,7 @@ function assessProcessing(product) {
   const relevantFlaggedIngredients = countRelevantFlaggedIngredients(product);
   const additiveLoad = Math.max(additiveTags.length, relevantFlaggedIngredients);
   if (additiveLoad >= 4) {
-    signals.push({
-      key: "additive_load",
-      label: "Multiple industrial additives / processing aids",
-      points: 3,
-    });
+    signals.push({ key: "additive_load", label: "Multiple industrial additives / processing aids", points: 3 });
   }
 
   const rawPoints = signals.reduce((sum, signal) => sum + signal.points, 0);
@@ -196,28 +185,45 @@ function assessProcessing(product) {
       hasIngredients: hasIngredientEvidence,
       hasNova: hasNovaEvidence,
       hasAdditives: hasAdditiveEvidence,
+      hasRuleEvidence,
       novaGroup,
       additiveCount: additiveTags.length,
     },
   };
 }
 
-/**
- * Normalizes per-serving nutrition to a per-100g / per-100ml basis.
- * Missing optional positive nutrients are treated as zero bonus without
- * claiming that the product label itself says 0g.
- */
 function per100g(product) {
   const n = product.nutrition || {};
   const servingSize = Math.max(1, safeNumber(product.servingSizeG, 100));
   const factor = 100 / servingSize;
   return {
     calories: safeNumber(n.calories) * factor,
+    totalFat_g: safeNumber(n.totalFat_g) * factor,
     sugar_g: safeNumber(n.sugar_g) * factor,
     satFat_g: safeNumber(n.satFat_g) * factor,
     sodium_mg: safeNumber(n.sodium_mg) * factor,
     fiber_g: safeNumber(n.fiber_g) * factor,
     protein_g: safeNumber(n.protein_g) * factor,
+  };
+}
+
+function solidDensityPenalty(n100, isDrink, availability = {}) {
+  if (isDrink) return { points: 0, energyPts: 0, totalFatPts: 0 };
+  const hasCalories = availability.calories !== false;
+  const hasTotalFat = availability.totalFat !== false;
+  const w = CALO_SCORE_WEIGHTS.density;
+  const energyRatio = hasCalories
+    ? clamp01((n100.calories - w.energyStart) / (w.energyAt - w.energyStart))
+    : 0;
+  const fatRatio = hasTotalFat
+    ? clamp01((n100.totalFat_g - w.fatStart) / (w.fatAt - w.fatStart))
+    : 0;
+  const energyPts = energyRatio * w.energyMax;
+  const totalFatPts = fatRatio * w.fatMax;
+  return {
+    points: Math.min(w.max, energyPts + totalFatPts),
+    energyPts,
+    totalFatPts,
   };
 }
 
@@ -237,6 +243,10 @@ function computeCaloScore(product) {
   const sugarPts = sugarRatio * CALO_SCORE_WEIGHTS.sugar.max;
   const satFatPts = satFatRatio * CALO_SCORE_WEIGHTS.satFat.max;
   const sodiumPts = sodiumRatio * CALO_SCORE_WEIGHTS.sodium.max;
+  const density = solidDensityPenalty(n100, isDrink, {
+    calories: product.nutrition?.calories != null,
+    totalFat: product.nutrition?.totalFat_g != null,
+  });
   const concernPts = processing.points;
 
   const anyAxisMaxed = sugarRatio >= 1 || satFatRatio >= 1 || sodiumRatio >= 1;
@@ -247,7 +257,7 @@ function computeCaloScore(product) {
     ? 0
     : clamp01(n100.fiber_g / CALO_SCORE_WEIGHTS.fiber.at) * CALO_SCORE_WEIGHTS.fiber.max;
 
-  const raw = 100 - sugarPts - satFatPts - sodiumPts - concernPts + proteinBonus + fiberBonus;
+  const raw = 100 - sugarPts - satFatPts - sodiumPts - density.points - concernPts + proteinBonus + fiberBonus;
   const score = Math.round(Math.max(0, Math.min(100, raw)));
 
   return {
@@ -258,10 +268,14 @@ function computeCaloScore(product) {
     processingIncludedInScore: true,
     scoreScope: "comprehensive-parity",
     processing,
+    density,
     breakdown: {
       sugarPts: Math.round(sugarPts),
       satFatPts: Math.round(satFatPts),
       sodiumPts: Math.round(sodiumPts),
+      densityPts: Math.round(density.points),
+      energyDensityPts: Math.round(density.energyPts),
+      totalFatPts: Math.round(density.totalFatPts),
       concernPts: Math.round(concernPts),
       proteinBonus: Math.round(proteinBonus),
       fiberBonus: Math.round(fiberBonus),
