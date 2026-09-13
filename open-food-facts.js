@@ -33,7 +33,7 @@ function offPer100WithServingFallback(nutriments, key, servingSize) {
   if (servingValue == null) return null;
 
   const multiplier = offServingMultiplier(servingSize);
-  if (!Number.isFinite(multiplier) || multiplier <= 0 || multiplier === 1 && !String(servingSize || "").trim()) return null;
+  if (!Number.isFinite(multiplier) || multiplier <= 0 || (multiplier === 1 && !String(servingSize || "").trim())) return null;
   return servingValue / multiplier;
 }
 
@@ -132,7 +132,55 @@ function offConfidence(product, processingCoverage, nutritionCoverage) {
   if (processingCoverage === "medium" || processingCoverage === "insufficient" || nutritionCoverage !== "full") points = Math.min(points, 8);
   if (points >= 10) return { level: "High", className: "high", note: "Core nutrition and processing evidence are well populated in Open Food Facts." };
   if (points >= 7) return { level: "Medium", className: "medium", note: "Enough evidence to score, but some product or processing fields are incomplete or community-sourced." };
-  return { level: "Low", className: "low", note: "Open Food Facts has limited evidence for this product. Treat the result as directional and verify the label." };
+  return { level: "Low", className: "low", note: "Open Food Facts has limited evidence for this product. The score is provisional and uses neutral assumptions for missing negative dimensions." };
+}
+
+function computeOpenFoodFactsScore(product) {
+  if (!product?.canScore) return null;
+
+  const servingFactor = Math.max(1, offNumber(product.servingSizeG) || 100) / 100;
+  const scoringNutrition = { ...(product.nutrition || {}) };
+  const isDrink = isDrinkProduct(product);
+  const assumedAxes = [];
+
+  if (scoringNutrition.sugar_g == null) {
+    const per100 = (isDrink ? CALO_SCORE_WEIGHTS.sugar.atDrink : CALO_SCORE_WEIGHTS.sugar.at) * 0.5;
+    scoringNutrition.sugar_g = per100 * servingFactor;
+    assumedAxes.push("sugar");
+  }
+  if (scoringNutrition.satFat_g == null) {
+    const per100 = (isDrink ? CALO_SCORE_WEIGHTS.satFat.atDrink : CALO_SCORE_WEIGHTS.satFat.at) * 0.5;
+    scoringNutrition.satFat_g = per100 * servingFactor;
+    assumedAxes.push("saturated fat");
+  }
+  if (scoringNutrition.sodium_mg == null) {
+    const per100 = (isDrink ? CALO_SCORE_WEIGHTS.sodium.atDrink : CALO_SCORE_WEIGHTS.sodium.at) * 0.5;
+    scoringNutrition.sodium_mg = per100 * servingFactor;
+    assumedAxes.push("sodium");
+  }
+
+  const scoreProduct = { ...product, nutrition: scoringNutrition };
+  const result = computeCaloScore(scoreProduct);
+  let score = result.score;
+  let assumedProcessingPenalty = 0;
+
+  if (!result.processing.canAssess) {
+    assumedProcessingPenalty = Math.round(CALO_SCORE_WEIGHTS.concerns.max * 0.5);
+    score = Math.max(0, score - assumedProcessingPenalty);
+  }
+
+  return {
+    ...result,
+    score,
+    provisional: assumedAxes.length > 0 || assumedProcessingPenalty > 0,
+    assumedAxes,
+    assumedProcessingPenalty,
+    scoreScope: assumedAxes.length > 0 || assumedProcessingPenalty > 0 ? "provisional-partial" : result.scoreScope,
+    breakdown: {
+      ...result.breakdown,
+      concernPts: result.breakdown.concernPts + assumedProcessingPenalty,
+    },
+  };
 }
 
 function adaptOpenFoodFactsProduct(code, product) {
@@ -147,7 +195,10 @@ function adaptOpenFoodFactsProduct(code, product) {
     protein_g: offPer100WithServingFallback(nutriments, "proteins", product.serving_size),
   };
 
-  const coreKnown = [per100.sugar_g, per100.satFat_g, per100.sodium_mg].filter((v) => v != null).length;
+  const corePairs = [["sugar", per100.sugar_g], ["saturated fat", per100.satFat_g], ["sodium", per100.sodium_mg]];
+  const knownCoreNutrients = corePairs.filter(([, value]) => value != null).map(([name]) => name);
+  const missingCoreNutrients = corePairs.filter(([, value]) => value == null).map(([name]) => name);
+  const coreKnown = knownCoreNutrients.length;
   const nutritionCoverage = coreKnown === 3 ? "full" : coreKnown === 2 ? "limited" : "insufficient";
   const servingLabel = product.serving_size || "100g / 100ml reference";
   const nutrition = {
@@ -163,9 +214,13 @@ function adaptOpenFoodFactsProduct(code, product) {
   const processingContext = offProcessingContext(product);
   const provisional = { isOpenFoodFacts: true, ingredients, processingContext, concernMarkers: [] };
   const processing = assessProcessing(provisional);
-  const canScore = nutritionCoverage === "full";
-  const missingReason = canScore ? "" : "Open Food Facts needs sugar, saturated fat and sodium (or salt), either per 100g/ml or per serving with a valid serving size, to calculate a safe score.";
-  const scoreDataQuality = canScore ? (processing.canAssess ? "full" : "nutrition-only") : nutritionCoverage;
+
+  // Give a provisional score whenever OFF provides at least one core negative nutrient.
+  // Missing negative dimensions are handled conservatively in computeOpenFoodFactsScore().
+  const canScore = coreKnown >= 1;
+  const scoreDataQuality = nutritionCoverage === "full"
+    ? (processing.canAssess ? "full" : "nutrition-only")
+    : `provisional-${nutritionCoverage}`;
 
   return {
     id: `off-${code}`,
@@ -185,13 +240,15 @@ function adaptOpenFoodFactsProduct(code, product) {
     positiveFlags: [],
     ingredients,
     processingContext,
-    verdict: canScore ? "" : `Score unavailable because ${missingReason}`,
+    verdict: canScore ? "" : "Score unavailable because Open Food Facts does not provide any of sugar, saturated fat, sodium or salt for this product.",
     dataConfidence: offConfidence(product, processing.coverage, nutritionCoverage),
     offUrl: `https://world.openfoodfacts.org/product/${encodeURIComponent(code)}`,
     canScore,
-    scoreScope: processing.canAssess ? "comprehensive-parity" : "nutrition-only",
+    scoreScope: nutritionCoverage === "full" && processing.canAssess ? "comprehensive-parity" : "provisional-partial",
     scoreDataQuality,
     nutritionCoverage,
+    knownCoreNutrients,
+    missingCoreNutrients,
     processingAssessed: processing.canAssess,
   };
 }
