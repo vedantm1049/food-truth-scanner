@@ -12,7 +12,7 @@ function product(overrides = {}) {
   return {
     category: "snacks",
     servingSizeG: 100,
-    nutrition: { calories: 300, sugar_g: 8, satFat_g: 2, sodium_mg: 250, fiber_g: 3, protein_g: 6 },
+    nutrition: { calories: 300, totalFat_g: 8, sugar_g: 8, satFat_g: 2, sodium_mg: 250, fiber_g: 3, protein_g: 6 },
     concernMarkers: [],
     ingredients: [],
     ...overrides,
@@ -36,58 +36,60 @@ const curatedProcessing = assessProcessing(processedCurated);
 const offProcessing = assessProcessing(offEquivalent);
 assert.strictEqual(offProcessing.canAssess, true);
 assert.ok(offProcessing.points > 0, "OFF processing evidence must produce processing penalties");
-assert.strictEqual(
-  offProcessing.points,
-  curatedProcessing.points,
-  "Equivalent ingredient evidence must not receive extra points merely because OFF also exposes NOVA metadata"
-);
+assert.strictEqual(offProcessing.points, curatedProcessing.points, "Equivalent ingredient evidence must not receive extra points merely because OFF also exposes NOVA metadata");
 
 const offTagsOnly = product({
   isOpenFoodFacts: true,
   ingredients: [],
-  processingContext: {
-    novaGroup: null,
-    additiveTags: ["en:e955", "en:e202", "en:e471"],
-    additiveDataAvailable: true,
-    note: "",
-  },
+  processingContext: { novaGroup: null, additiveTags: ["en:e955", "en:e202", "en:e471"], additiveDataAvailable: true, note: "" },
 });
 const offTagsOnlyProcessing = assessProcessing(offTagsOnly);
 assert.strictEqual(offTagsOnlyProcessing.canAssess, true, "structured additive tags alone must be usable processing evidence");
 assert.strictEqual(offTagsOnlyProcessing.points, 14, "sweetener, preservative and emulsifier tags should produce their three grouped penalties");
-assert.deepStrictEqual(
-  Array.from(offTagsOnlyProcessing.signals, (signal) => signal.key),
-  ["sweeteners", "preservatives", "texture_agents"],
-  "standard OFF E-number tags must map to the same processing families as named ingredients"
-);
+assert.deepStrictEqual(Array.from(offTagsOnlyProcessing.signals, (signal) => signal.key), ["sweeteners", "preservatives", "texture_agents"]);
 
-const offNovaFallback = product({
-  isOpenFoodFacts: true,
-  ingredients: [],
-  processingContext: { novaGroup: 4, additiveTags: [], additiveDataAvailable: false, note: "NOVA 4 ultra-processed" },
-});
+const offNovaFallback = product({ isOpenFoodFacts: true, ingredients: [], processingContext: { novaGroup: 4, additiveTags: [], additiveDataAvailable: false, note: "NOVA 4 ultra-processed" } });
 assert.ok(assessProcessing(offNovaFallback).points > 0, "NOVA 4 must still provide a fallback processing signal when richer evidence is absent");
-
 const offMissingProcessing = product({ isOpenFoodFacts: true, ingredients: [], processingContext: { additiveTags: [], additiveDataAvailable: false } });
 assert.strictEqual(assessProcessing(offMissingProcessing).canAssess, false, "Missing OFF processing evidence must not be treated as clean");
 
 const allergenOnly = product({ concernMarkers: ["May contain milk and soy (cross-contact)"], ingredients: [{ name: "Wheat", flag: null, reason: "allergen" }] });
 assert.strictEqual(assessProcessing(allergenOnly).points, 0, "Allergen information must not count as processing");
-
 const highSatFatNote = product({ concernMarkers: ["Saturated fat is high for the size"], ingredients: [{ name: "Butter", flag: null, reason: "" }] });
 assert.strictEqual(assessProcessing(highSatFatNote).points, 0, "Nutrition warnings must not be double-counted as processing");
 
-const highSugar = product({ nutrition: { calories: 300, sugar_g: 30, satFat_g: 2, sodium_mg: 250, fiber_g: 8, protein_g: 20 }, ingredients: [{ name: "Whole oats" }] });
+const highSugar = product({ nutrition: { calories: 300, totalFat_g: 8, sugar_g: 30, satFat_g: 2, sodium_mg: 250, fiber_g: 8, protein_g: 20 }, ingredients: [{ name: "Whole oats" }] });
 const highSugarResult = computeCaloScore(highSugar);
 assert.strictEqual(highSugarResult.breakdown.proteinBonus, 0);
 assert.strictEqual(highSugarResult.breakdown.fiberBonus, 0);
 
-const missingPositiveNutrients = product({
-  nutrition: { calories: 300, sugar_g: 8, satFat_g: 2, sodium_mg: 250, fiber_g: null, protein_g: null },
-  ingredients: [{ name: "Whole oats" }],
-});
+const missingPositiveNutrients = product({ nutrition: { calories: 300, totalFat_g: 8, sugar_g: 8, satFat_g: 2, sodium_mg: 250, fiber_g: null, protein_g: null }, ingredients: [{ name: "Whole oats" }] });
 const missingPositiveResult = computeCaloScore(missingPositiveNutrients);
 assert.strictEqual(missingPositiveResult.breakdown.proteinBonus, 0, "missing protein must never become a positive bonus");
 assert.strictEqual(missingPositiveResult.breakdown.fiberBonus, 0, "missing fiber must never become a positive bonus");
+
+// Regression: a low-sugar but fried, calorie-dense bhujia-style snack must not
+// qualify as a "Solid pick" simply because sugar is low.
+const bhujia = product({
+  name: "Bhujia",
+  nutrition: { calories: 580, totalFat_g: 40.8, sugar_g: 3.1, satFat_g: 6.7, sodium_mg: 754, fiber_g: 0, protein_g: 0 },
+  ingredients: [{ name: "Gram flour" }, { name: "Vegetable oil" }, { name: "Salt" }],
+});
+const bhujiaResult = computeCaloScore(bhujia);
+assert.ok(bhujiaResult.score < 40, `bhujia-style fried snack should score below 40, got ${bhujiaResult.score}`);
+assert.ok(bhujiaResult.breakdown.densityPts >= 10, "calorie/fat density should materially lower a fried snack score");
+assert.ok(bhujiaResult.processing.signals.some((s) => s.key === "fried_snack"), "bhujia name should trigger fried-snack processing evidence");
+
+// Regression: ordinary plain yoghurt should not be punished by the solid-food
+// density safeguard.
+const yoghurt = product({
+  name: "Plain full cream yoghurt",
+  category: "other_dairy_products",
+  nutrition: { calories: 80, totalFat_g: 4, sugar_g: 5, satFat_g: 2.5, sodium_mg: 50, fiber_g: 0, protein_g: 4 },
+  ingredients: [{ name: "Milk" }, { name: "Live cultures" }],
+});
+const yoghurtResult = computeCaloScore(yoghurt);
+assert.strictEqual(yoghurtResult.breakdown.densityPts, 0, "plain yoghurt should have no density penalty at normal calorie/fat levels");
+assert.ok(yoghurtResult.score >= 70, `plain yoghurt should remain a strong score, got ${yoghurtResult.score}`);
 
 console.log("Comprehensive scoring parity tests passed.");
