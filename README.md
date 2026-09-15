@@ -4,7 +4,9 @@ Scan a grocery barcode to get an explainable food score and see how one serving 
 
 <img width="400" height="564" alt="Food Truth Scanner GIF" src="https://github.com/user-attachments/assets/cf9b6c28-8799-431b-936e-52340a75a446" />
 
-**Live demo:** https://vedantm1049.github.io/food-truth-scanner/
+[**Try the guided scanner demo**](https://vedantm1049.github.io/food-truth-scanner/)
+
+Start on Scan. Tap **Scan a barcode** to open the camera, or **Try a sample product** to explore Barebells Peanut Caramel with its ingredient details expanded. The initial demo profile flags dairy and peanuts; sample warnings follow your Account settings. **Browse the Market** opens the sample catalogue, scored using the same logic.
 
 [**Read the product decisions**](product-decisions.md) — the trade-offs behind scoring parity, missing-data handling, processing evidence, personalization, and where the model deliberately avoids false precision.
 

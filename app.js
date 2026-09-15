@@ -47,7 +47,7 @@ const CATEGORY_LABELS = {
 
 /* ---------------- State ---------------- */
 const state = {
-  tab: "market",
+  tab: "scan",
   overlay: null, // {type:'result', id} | {type:'scan'} | {type:'browse'} | {type:'methodology'} | {type:'editProfile'} | {type:'notFound', code} | {type:'cart'}
   marketFilter: "all",
   marketSort: "score-desc", // "score-desc" | "score-asc" — Market has no "default order" option
@@ -186,17 +186,37 @@ function renderBottomNav() {
     <div class="bottom-nav">
       ${tabs
         .map((t) =>
-          t.key === "scan"
-            ? `<div class="nav-item" onclick="openScan()">
-                ${t.icon}<span>${t.label}</span>
-              </div>`
-            : `<div class="nav-item ${state.tab === t.key ? "active" : ""}" onclick="openTab('${t.key}')">
+          `<div class="nav-item ${state.tab === t.key ? "active" : ""}" onclick="openTab('${t.key}')" ${state.tab === t.key ? 'aria-current="page"' : ""}>
                 ${t.icon}<span>${t.label}</span>
               </div>`
         )
         .join("")}
     </div>
   </div>`;
+}
+
+/* ---------------- Guided Scan tab ---------------- */
+const GUIDED_SAMPLE_PRODUCT_ID = "barebells-peanut-caramel-bar-55g";
+
+function renderScanHome() {
+  return `<div class="screen">
+    ${renderTopbar()}
+    <div class="app-content scan-home">
+      <h1 class="page-title">Know what is in your food.</h1>
+      <p class="page-sub">Scan a barcode for an explainable food score, ingredient details and warnings matched to your profile.</p>
+      <button type="button" class="btn-primary" onclick="openScan(); startCameraScan()">${ICONS.scan}Scan a barcode</button>
+      <button type="button" class="btn-secondary" onclick="openSampleProduct()">Try a sample product</button>
+      <p class="sample-note">Try Barebells Peanut Caramel to explore nutrition trade-offs and ingredient explanations. The initial demo profile flags dairy and peanuts; warnings follow your Account settings.</p>
+      <a class="market-text-link" href="#market" onclick="event.preventDefault(); openTab('market')">Browse the Market</a>
+    </div>
+    ${renderBottomNav()}
+  </div>`;
+}
+
+function openSampleProduct() {
+  state.overlay = { type: "result", id: GUIDED_SAMPLE_PRODUCT_ID };
+  state.ingredientsExpanded = true;
+  render();
 }
 
 /* ---------------- Meals tab ---------------- */
@@ -252,6 +272,7 @@ function renderMarket() {
   return `<div class="screen">
   ${renderTopbar("Market")}
   <div class="app-content">
+    <p class="page-sub">Explore sample products scored using the same logic as the scanner.</p>
     <div class="market-toolbar" style="margin-top:14px;">
       ${cats
         .map(
@@ -989,6 +1010,9 @@ function render() {
 
   let html = "";
   switch (state.tab) {
+    case "scan":
+      html = renderScanHome();
+      break;
     case "meals":
       html = renderMeals();
       break;
