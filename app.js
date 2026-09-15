@@ -47,7 +47,7 @@ const CATEGORY_LABELS = {
 
 /* ---------------- State ---------------- */
 const state = {
-  tab: "meals",
+  tab: "market",
   overlay: null, // {type:'result', id} | {type:'scan'} | {type:'browse'} | {type:'methodology'} | {type:'editProfile'} | {type:'notFound', code} | {type:'cart'}
   marketFilter: "all",
   marketSort: "score-desc", // "score-desc" | "score-asc" — Market has no "default order" option
@@ -168,7 +168,6 @@ function renderTopbar(title) {
     <span class="logo-text">Scan</span>
     ${title ? `<span class="topbar-title">${title}</span>` : `<span style="flex:1;"></span>`}
     <div class="topbar-actions">
-      <span class="icon-btn" onclick="openSupportSheet()" aria-label="Support">${ICONS.headphones}</span>
       <span class="icon-btn" onclick="openCart()" aria-label="Cart">
         ${ICONS.cart}
         ${count ? `<span class="cart-badge">${count}</span>` : ""}
@@ -179,9 +178,7 @@ function renderTopbar(title) {
 
 function renderBottomNav() {
   const tabs = [
-    { key: "meals", label: "Meals", icon: ICONS.meals },
     { key: "market", label: "Market", icon: ICONS.market },
-    { key: "cafe", label: "Cafe", icon: ICONS.cafe },
     { key: "scan", label: "Scan", icon: ICONS.scan },
     { key: "account", label: "Account", icon: ICONS.account },
   ];
