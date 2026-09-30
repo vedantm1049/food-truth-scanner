@@ -44,11 +44,14 @@ The score starts at 100 and applies:
 - Sugar: up to **−40**
 - Saturated fat: up to **−15**
 - Sodium: up to **−20**
+- Solid-food energy / fat density: up to **−15** (solid foods only; drinks are exempt)
 - Processing / ingredient concerns: up to **−25**
 - Protein: up to **+8**
 - Fiber: up to **+6**
 
 Nutrition is normalized per 100g/100ml. Published UK Food Standards Agency front-of-pack thresholds are used as nutrient-density anchors for sugar, saturated fat and sodium, with stricter drink thresholds.
+
+For solid foods, a capped energy / total-fat density safeguard stops fried, calorie-dense snacks from looking healthy simply because they are low in sugar. Energy adds up to 10 points, rising from 250 to 550 kcal per 100g; total fat adds up to 8 points, rising from 10g to 35g per 100g; the two together are capped at 15. Normal foods such as plain yoghurt sit below both thresholds and receive no density penalty.
 
 **The point weights above are Food Truth Scanner prototype heuristics, not an FSA score or a medical recommendation.** They are deliberately deterministic and visible so the model can be inspected, challenged and revised. Protein and fiber bonuses are disabled once sugar, saturated fat or sodium reaches its high threshold.
 
